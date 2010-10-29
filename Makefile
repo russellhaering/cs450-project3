@@ -1,4 +1,4 @@
-NAME = prog2
+NAME = prog3
 
 CC = g++ 
 

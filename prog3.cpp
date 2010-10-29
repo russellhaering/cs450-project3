@@ -13,8 +13,15 @@
 enum buttonTypes {OBJ_TEXTFIELD = 0, LOAD_BUTTON};
 enum colors {RED, GREEN, BLUE};
 enum projections {ORTHO, PERSP, FOV};
+enum transforms {
+  TRANSLATIONXY = 0,
+  TRANSLATIONZ,
+  ROTATION,
+  SCALE
+};
+enum cameraOps {CAMROTATE = 0, TRACK, DOLLY};
 
-#define WIN_WIDTH         500
+#define WIN_WIDTH         1000
 #define WIN_HEIGHT        500
 
 #define ORTHO_DENOMINATOR 100
@@ -45,6 +52,13 @@ int green = MAX_COLOR;
 int blue = MAX_COLOR;
 int fov = 90;
 int projType = ORTHO;
+float rotMat[16];
+float xyTrans[2] = {0.0,0.0};
+float zTrans = 0.0;
+float objScale = 1.0;
+float camRotMat[16];
+float camTrack[2] = {0.0, 0.0};
+float camDolly = 0.0;
 
 /** Globals **/
 struct obj_data *data = NULL;
@@ -52,7 +66,6 @@ GLUI *glui;
 GLUI_EditText *objFileNameTextField;
 GLUI_Spinner *fovSpinner;
 int selected = -1;
-
 
 /**
  * update_projection - configure the specifed projection mode on the current
@@ -95,10 +108,10 @@ void update_projection()
 }
 
 /**
- * projection_callback - called when projection (or color, for soem reason)
+ * projection_cb - called when projection (or color, for soem reason)
  * parameters are modified, updates the projection mode and fires a redisplay
  */
-void projection_callback(int id)
+void projection_cb(int id)
 {
   // Set up the projection matrix
   glMatrixMode(GL_PROJECTION);
@@ -114,18 +127,18 @@ void projection_callback(int id)
 }
 
 /**
- * text_callback - fired when the filename text is modified, not much reason
+ * text_cb - fired when the filename text is modified, not much reason
  * to do anything in here.
  */
-void text_callback(int id)
+void text_cb(int id)
 {
 }
 
 /**
- * button_callback - fired when the load file button is pressed, loads the
+ * button_cb - fired when the load file button is pressed, loads the
  * currently specified file and fires a redisplay
  */
-void button_callback(int control)
+void button_cb(int control)
 {
   struct obj_data *d, *curr;
   d = load_obj_file(objFileNameTextField->get_text());
@@ -144,11 +157,11 @@ void button_callback(int control)
 }
 
 /**
- * color_callback - fired when the color parameters change, but so is
+ * color_cb - fired when the color parameters change, but so is
  * the projection callback. This doesn't do anything to avoid a double
  * redisplay.
  */
-void color_callback(int id)
+void color_cb(int id)
 {
 }
 
@@ -235,10 +248,10 @@ void draw_objects(void)
 }
 
 /**
- * display_callback - the display callback, called to draw the scene. Clears
+ * display_cb - the display callback, called to draw the scene. Clears
  * the scene, draws the objects then flushes and swaps the bufers.
  */
-void display_callback()
+void display_cb()
 {
   glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
   glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
@@ -248,10 +261,10 @@ void display_callback()
 }
 
 /**
- * reshape_callback - called when the window is reshaped, updates the viewport
+ * reshape_cb - called when the window is reshaped, updates the viewport
  * and projection then redraws the scene.
  */
-void reshape_callback (int x, int y)
+void reshape_cb (int x, int y)
 {
   // Update the viewport
   glViewport(0, 0, x, y);
@@ -267,10 +280,10 @@ void reshape_callback (int x, int y)
 }
 
 /**
- * mouse_callback - called on mouse clicks, updates the global 'selected'
+ * mouse_cb - called on mouse clicks, updates the global 'selected'
  * ID to reflect which object was clicked, then redraws the scene.
  */
-void mouse_calback (int button, int state, int x, int y)
+void mouse_cb (int button, int state, int x, int y)
 {
   int hits, i, names;
   GLuint selectBuf[SBUF_SIZE] = {0};
@@ -335,6 +348,34 @@ void mouse_calback (int button, int state, int x, int y)
   }
 }
 
+void rotation_cb(int id)
+{
+}
+
+void translate_xy_cb(int id)
+{
+}
+
+void translate_z_cb(int id)
+{
+}
+
+void scale_cb(int id)
+{
+}
+
+void cam_rotation_cb(int id)
+{
+}
+
+void track_xy_cb(int id)
+{
+}
+
+void dolly_cb(int id)
+{
+}
+
 void init_scene()
 {
   // This stuff is for lighting and materials. We'll learn more about
@@ -366,43 +407,66 @@ int main(int argc, char **argv)
   glutInitWindowPosition(50, 50);
   glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
 
-  //You'll need a handle for your main window for GLUI
+  // Create the GUI window
   main_window = glutCreateWindow("OBJ Loader");
-  glutDisplayFunc(display_callback);
-  glutReshapeFunc(reshape_callback);
-  glutMouseFunc(mouse_calback);
+  glutDisplayFunc(display_cb);
+  glutReshapeFunc(reshape_cb);
+  glutMouseFunc(mouse_cb);
 
-  // Initialize my Scene
+  // Initialize OpenGL
   init_scene();
 
-  //Build the GU
   glui = GLUI_Master.create_glui("OBJ Loader GUI", 0);
 
+  // Object Loading Panel
   GLUI_Panel *objPanel = glui->add_panel("Obj Files");
-  objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:", GLUI_EDITTEXT_TEXT, 0, OBJ_TEXTFIELD, text_callback);
-  glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, button_callback);
+  objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:", GLUI_EDITTEXT_TEXT, 0, OBJ_TEXTFIELD, text_cb);
+  glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, button_cb);
+
   glui->add_separator();
 
+  // Projection Type Panel
   GLUI_Panel *projPanel = glui->add_panel("Projection");
-  GLUI_RadioGroup *projGroup = glui->add_radiogroup_to_panel(projPanel, &projType, -1, projection_callback);
+  GLUI_RadioGroup *projGroup = glui->add_radiogroup_to_panel(projPanel, &projType, -1, projection_cb);
   glui->add_radiobutton_to_group(projGroup, "Orthographic");
   glui->add_radiobutton_to_group(projGroup, "Perspective");
-  GLUI_Spinner *fovSpinner =glui->add_spinner_to_panel(projPanel, "FOV", GLUI_SPINNER_INT, &fov, FOV, projection_callback);
-  fovSpinner->set_int_limits(0, 90);
+  GLUI_Spinner *fovSpinner =glui->add_spinner_to_panel(projPanel, "FOV", GLUI_SPINNER_INT, &fov, FOV, projection_cb);
+  fovSpinner->set_int_limits(0, 90, GLUI_LIMIT_CLAMP);
 
+  // Object Transformations Panel
+  GLUI_Panel *transformsPanel = glui->add_panel("Object Transformations");
+  GLUI_Rotation *rotationManip = glui->add_rotation_to_panel(transformsPanel, "Rotation", rotMat, ROTATION,rotation_cb);
+  rotationManip->reset();
+  glui->add_column_to_panel(transformsPanel, true);
+  GLUI_Translation *translateXYManip = glui->add_translation_to_panel(transformsPanel, "Translate XY", GLUI_TRANSLATION_XY, xyTrans, TRANSLATIONXY, translate_xy_cb);
+  glui->add_column_to_panel(transformsPanel, true);
+  GLUI_Translation *translateZManip = glui->add_translation_to_panel(transformsPanel, "Translate Z", GLUI_TRANSLATION_Z, &zTrans, TRANSLATIONZ, translate_z_cb);
+  glui->add_column_to_panel(transformsPanel, true);
+  GLUI_Spinner *scaleSpinner = glui->add_spinner_to_panel(transformsPanel, "Scale", GLUI_SPINNER_FLOAT, &objScale, SCALE, scale_cb);
+  scaleSpinner->set_float_limits(0, 2.0, GLUI_LIMIT_CLAMP);
+
+  // Camera Manipulation Panel
+  GLUI_Panel *cameraPanel = glui->add_panel("Camera Manipulation Mode");
+  GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE,cam_rotation_cb);
+  camRotationManip->reset();
+  glui->add_column_to_panel(cameraPanel, true);
+  GLUI_Translation *trackXYManip = glui->add_translation_to_panel(cameraPanel, "Track XY", GLUI_TRANSLATION_XY, camTrack, TRACK, track_xy_cb);
+  glui->add_column_to_panel(cameraPanel, true);
+  GLUI_Translation *dollyManip = glui->add_translation_to_panel(cameraPanel, "Dolly", GLUI_TRANSLATION_Z, &camDolly, DOLLY, dolly_cb);
+
+  // Object Color Panel
   GLUI_Panel *colorPanel = glui->add_panel("Color");
-  /* These should be done with floats but the speed won't work */
-  GLUI_Spinner *redValue = glui->add_spinner_to_panel(colorPanel, "Red", 2, &red, RED, color_callback);
+  GLUI_Spinner *redValue = glui->add_spinner_to_panel(colorPanel, "Red", 2, &red, RED, color_cb);
   redValue->set_int_limits(0, MAX_COLOR);
-  GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", 2, &green, GREEN, color_callback);
+  GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", 2, &green, GREEN, color_cb);
   greenValue->set_int_limits(0, MAX_COLOR);
-  GLUI_Spinner *blueValue = glui->add_spinner_to_panel(colorPanel, "Blue", 2, &blue, BLUE, color_callback);
+  GLUI_Spinner *blueValue = glui->add_spinner_to_panel(colorPanel, "Blue", 2, &blue, BLUE, color_cb);
   blueValue->set_int_limits(0, MAX_COLOR);
   glui->set_main_gfx_window(main_window);
 
-  // We register the idle callback with GLUI, *not* with GLUT
-  //GLUI_Master.set_glutIdleFunc(myGlutIdle);
   GLUI_Master.set_glutIdleFunc(NULL);
+  glui->sync_live();
+
   glutMainLoop();
   return EXIT_SUCCESS;
 }
