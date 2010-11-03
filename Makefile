@@ -13,8 +13,8 @@ ifeq ($(UNAME), Linux)
   GLFLAGS = -lGL -lGLU -lglut -lglui
 endif
 
-$(NAME): $(NAME).cpp obj.o
-	$(CC) $(CFLAGS) $(GLFLAGS) -o $(NAME) $(NAME).cpp obj.o
+$(NAME): $(NAME).cpp
+	$(CC) $(CFLAGS) $(GLFLAGS) -o $(NAME) $(NAME).cpp
 
 clean:
 	rm -rf $(NAME) *.o

@@ -1,5 +1,11 @@
-#include <stdlib.h> /* Must come first to avoid redef error */
-#include <stdio.h>
+/************************************************************************/
+/*                         CS 450 Assignment3                           */
+/*                           Russell Haering                            */
+/*           Based on Assignment 2 Solution by Christophe Torne         */
+/*                            11/3/2010                                 */
+/************************************************************************/
+
+#include <stdlib.h>
 
 #ifdef __APPLE__
 #include <GLUI/glui.h>
@@ -7,466 +13,543 @@
 #include <GL/glui.h>
 #endif
 
-#include "obj.h"
+#include <string>
+#include <vector>
+#include <fstream>
+#include <iostream>
 
-/** Constants and enums **/
+using namespace std;
+
+/************************************************************************/
+/*                          DATA STRUCTURES                             */
+/************************************************************************/
+
+typedef struct
+{
+	float r, g, b;
+} Color;
+
+typedef struct
+{
+	int v, n;
+} Point;
+
+typedef struct Object
+{
+	Color color;
+	string name;
+	float (*normals)[3], (*vertices)[3];
+	Point (*faces)[3];
+	int numVertices, numNormals, numFaces;
+	GLuint displayList;
+
+} Object;
+
 enum buttonTypes {OBJ_TEXTFIELD = 0, LOAD_BUTTON};
-enum colors {RED, GREEN, BLUE};
-enum projections {ORTHO, PERSP, FOV};
-enum transforms {
-  TRANSLATIONXY = 0,
-  TRANSLATIONZ,
-  ROTATION,
-  SCALE
-};
-enum cameraOps {CAMROTATE = 0, TRACK, DOLLY};
+enum colors	{RED = 0, GREEN, BLUE};
+enum projections {ORTHO = 0, PERSP};
+enum transformations {TRANS = 0, ROT, SCALE};
+enum camTransforms {CAMROTATE = 0 , TRACK, DOLLY};
+const int FOV = 2;
 
-#define WIN_WIDTH         1000
-#define WIN_HEIGHT        500
+/************************************************************************/
+/*                       FUNCTION PROTOTYPES                            */
+/************************************************************************/
 
-#define ORTHO_DENOMINATOR 100
+int		loadObj			(char *, Object &);
+void	setupVV			(void);
+void	projCB			(int);
+void	textCB			(int);
+void	buttonCB		(int);
+void	colorCB			(int);
+void	drawObjects		(GLenum);
+void	myGlutDisplay	(void);
+void	myGlutReshape	(int, int);
+void	myGlutMouse		(int , int , int , int );
+void	processHits		(GLint, GLuint[]);
+void	initScene		();
 
-#define SBUF_SIZE         64
+/************************************************************************/
+/*                   CONSTANTS & GLOBAL VARIABLES                       */
+/************************************************************************/
 
-#define MAXD              0xFFFFFFFF
+vector<Object> Objects;
 
-#define MAX_COLOR         255
-#define WIREFRAME_OFFSET  -100.0
+const int WIN_WIDTH = 500;
+const int WIN_HEIGHT = 500;
 
-#define CLIPPING_NEAR     0.1
-#define CLIPPING_FAR      20
-
-#define PERSP_CAM_LOC     0, 0, .3
-#define PERSP_CAM_TGT     0, .1, 0
-#define PERSP_CAM_UP      0, 1, 0
-
-#define ORTHO_CAM_LOC     0, 0, .3
-#define ORTHO_CAM_TGT     0, .1, 0
-#define ORTHO_CAM_UP      0, 1, 0
-
-
-/** These are the live variables modified by the GUI ***/
 int main_window;
-int red = MAX_COLOR;
-int green = MAX_COLOR;
-int blue = MAX_COLOR;
-int fov = 90;
-int projType = ORTHO;
-float rotMat[16];
-float xyTrans[2] = {0.0,0.0};
-float zTrans = 0.0;
-float objScale = 1.0;
+int objSelected = -1;
+
+float red = 1.f;
+float green = 1.f;
+float blue = 1.f;
+
+int fov = 30;
+const int FOVMIN = 0;
+const int FOVMAX = 90;
+
+projections projType = ORTHO;
+transformations transType = TRANS;
+
+int sizeX = WIN_WIDTH;
+int sizeY = WIN_WIDTH;
+float vl = -1.f;
+float vr = 1.f;
+float vb = -1.f;
+float vt = 1.f;
+const float vn = .9;
+const float vf = 3;
+
+float scaleFactor	= 1.f;
 float camRotMat[16];
 float camTrack[2] = {0.0, 0.0};
 float camDolly = 0.0;
 
-/** Globals **/
-struct obj_data *data = NULL;
 GLUI *glui;
 GLUI_EditText *objFileNameTextField;
-GLUI_Spinner *fovSpinner;
-int selected = -1;
+GLUI_String fileName = GLUI_String("frog.obj");
 
-/**
- * update_projection - configure the specifed projection mode on the current
- * matrix (you probably want GL_PROJECTION).
- */
-void update_projection()
+/************************************************************************/
+/*                       FUNCTION DEFINITIONS                           */
+/************************************************************************/
+/// Reads the contents of the obj file and appends the data at the end of
+/// the vector of Objects. This time we allow the same object to be loaded
+/// several times.
+int loadObj (char *fileName, Object &obj)
 {
-  GLint viewport[4];
-  float x_offset;
-  float y_offset;
+	ifstream file;
+	file.open (fileName);
 
-  // Load the viewport size
-  glGetIntegerv(GL_VIEWPORT, viewport);
+	if(!file.is_open ())
+	{
+		cerr << "Cannot open .obj file " << fileName << endl;
+		return EXIT_FAILURE;
+	}
 
-  switch (projType) {
-  case ORTHO:
-    // Configure orthographic projection
-    x_offset = ((float) viewport[2] / ORTHO_DENOMINATOR);
-    y_offset = ((float) viewport[3] / ORTHO_DENOMINATOR);
-    glOrtho(-x_offset, x_offset, -y_offset, y_offset, CLIPPING_NEAR, CLIPPING_FAR);
-    gluLookAt(ORTHO_CAM_LOC,
-              ORTHO_CAM_TGT,
-              ORTHO_CAM_UP);
-    break;
+	obj.name = string(fileName);
+	obj.color.r = 1.f;
+	obj.color.g = 1.f;
+	obj.color.b = 1.f;
 
-  case PERSP:
-    // Configure perspective projection
-    gluPerspective(fov, ((float) viewport[2] / (float) viewport[3]), CLIPPING_NEAR, CLIPPING_FAR);
-    gluLookAt(PERSP_CAM_LOC,
-              PERSP_CAM_TGT,
-              PERSP_CAM_UP);
-    break;
+	/// First pass: count the vertices, normals and faces, allocate the arrays.
+	int numVertices = 0, numNormals = 0, numFaces = 0;
+	string buffer;
+	while (getline(file, buffer), !buffer.empty())
+	{
+		if (buffer[0] == 'v')
+		{
+			if (buffer[1] == 'n')
+				numNormals++;
+			else
+			{
+				if (buffer[1] == ' ')
+					numVertices++;
+			}
+		}
+		else
+		{
+			if (buffer[0] == 'f')
+				numFaces++;
+		}
+	};
+	
+	obj.vertices = new float [numVertices][3];
+	obj.numVertices = numVertices;
+	obj.normals = new float [numNormals][3];
+	obj.numNormals = numNormals;
+	obj.faces = new Point [numFaces][3];
+	obj.numFaces = numFaces;
 
-  case FOV:
-    // This is used once for something apparently unrelated to the enum its in
+	file.clear();
+	file.seekg (ios::beg);
+	
+	/// Second pass: populate the arrays
+	numFaces = numNormals = numVertices = 0;
+	while (getline(file, buffer), !buffer.empty())
+	{
+		if (buffer[0] == 'v')
+		{
+			if (buffer[1] == 'n')
+			{
+				sscanf(	buffer.data() + 2*sizeof(char), " %f %f %f",	
+							&obj.normals[numNormals][0],
+							&obj.normals[numNormals][1],
+							&obj.normals[numNormals][2]);
+				numNormals++;
+			}
+			else
+			{
+				if (buffer[1] == ' ')
+				{
+					sscanf(	buffer.data() + sizeof(char), " %f %f %f",	
+								&obj.vertices[numVertices][0],
+								&obj.vertices[numVertices][1],
+								&obj.vertices[numVertices][2]);
+					numVertices++;
+				}
+			}
+		}
+		else
+		{
+			if (buffer[0] == 'f')
+			{
+				sscanf(	buffer.data() + sizeof(char), " %d//%d %d//%d %d//%d",	
+							&obj.faces[numFaces][0].v, &obj.faces[numFaces][0].n,
+							&obj.faces[numFaces][1].v, &obj.faces[numFaces][1].n,
+							&obj.faces[numFaces][2].v, &obj.faces[numFaces][2].n);
+				numFaces++;
+			}
+		}
+	};
 
-  default:
-    printf("Uh Oh\n");
-  }
+	file.close();
+	cout << "Finished loading " << fileName << endl;
+
+	/// Now we generate the display list.
+	obj.displayList = glGenLists(1);
+	glMatrixMode (GL_MODELVIEW);
+	glLoadIdentity ();
+	glNewList(obj.displayList, GL_COMPILE);
+	{
+		glBegin (GL_TRIANGLES);
+		{
+			for (int faceNum = 0 ; faceNum < obj.numFaces ; faceNum++)
+			{
+				glNormal3fv (obj.normals[obj.faces[faceNum][0].n-1]);
+				glVertex3fv (obj.vertices[obj.faces[faceNum][0].v-1]);
+				glNormal3fv (obj.normals[obj.faces[faceNum][1].n-1]);
+				glVertex3fv (obj.vertices[obj.faces[faceNum][1].v-1]);
+				glNormal3fv (obj.normals[obj.faces[faceNum][2].n-1]);
+				glVertex3fv (obj.vertices[obj.faces[faceNum][2].v-1]);
+			}
+		}
+		glEnd ();
+	}
+	glEndList ();
+
+	return EXIT_SUCCESS;
 }
 
-/**
- * projection_cb - called when projection (or color, for soem reason)
- * parameters are modified, updates the projection mode and fires a redisplay
- */
-void projection_cb(int id)
+void transCB(int id)
 {
-  // Set up the projection matrix
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  update_projection();
-
-  // Set up the modelview matrix
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-
-  // Redisplay
-  glutPostRedisplay();
+	switch(transType)
+	{
+		case TRANS:
+			printf("Translation Mode\n");
+			break;
+		case ROT:
+			printf("Rotation Mode\n");
+			break;
+		case SCALE:
+			printf("Scale Mode\n");
+			break;
+		default:break;
+	}
+	glui->sync_live ();
+	glutPostRedisplay ();
 }
 
-/**
- * text_cb - fired when the filename text is modified, not much reason
- * to do anything in here.
- */
-void text_cb(int id)
+void projCB(int id)
 {
+		switch(projType)
+		{
+			case ORTHO:
+				printf("Orthographic Projection\n");
+				break;
+			case PERSP:
+				printf("Perspective Projection \n");
+				break;
+			default:
+				break;
+		}
+	setupVV();
+	
+	glui->sync_live ();
+	glutPostRedisplay ();
 }
 
-/**
- * button_cb - fired when the load file button is pressed, loads the
- * currently specified file and fires a redisplay
- */
-void button_cb(int control)
+void fovCB(int id)
 {
-  struct obj_data *d, *curr;
-  d = load_obj_file(objFileNameTextField->get_text());
-
-  if (data == NULL) {
-    data = d;
-  }
-  else {
-    curr = data;
-    while (curr->next != NULL) {
-      curr = curr->next;
-    }
-    curr->next = d;
-  }
-  glutPostRedisplay();
+	printf("Updating the fov\n");
 }
 
-/**
- * color_cb - fired when the color parameters change, but so is
- * the projection callback. This doesn't do anything to avoid a double
- * redisplay.
- */
-void color_cb(int id)
-{
+void camRotationCB(int id) {
+	printf("Rotating the scene/camera\n");
 }
 
-/**
- * draw_object - draw the specified object in the current polygon mode
- */
-void draw_object(struct obj_data *curr)
-{
-    int i, j;
-    struct face *f;
-    struct vertex *v;
-    struct vertex_normal *vn;
-
-    // For now we are only supporting triangles
-    glBegin(GL_TRIANGLES);
-
-    for (i = 0; i < curr->faces->count; i++) {
-      f = (struct face *) curr->faces->items[i];
-      if (f->count != 3) {
-        printf("Skipping non-triangle face at index %d\n", i);
-        continue;
-      }
-      for (j = 0; j < f->count; j++) {
-        // Set the normal if there is one
-        if (f->vns != NULL) {
-          vn = (struct vertex_normal *) f->vns[j];
-          glNormal3f(vn->x, vn->y, vn->z);
-        }
-
-        // Set the vertex (there should always be one)
-        v = (struct vertex *) f->vs[j];
-        glVertex3f(v->x, v->y, v->z);
-      }
-    }
-
-    printf("Rendered %d faces\n", i);
-    glEnd();
+void dollyCB(int id) {
+	printf("Dollying the scene/camera\n");
 }
 
-/**
- * draw_objects - draw all loaded objects, with a wireframe and color on the
- * selected object.
- */
-void draw_objects(void)
-{
-  int i;
-  struct obj_data *curr;
-
-  curr = data;
-  i = 0;
-  while (curr != NULL) {
-    glPushName(i);
-
-    // Set the color - white for non-selected, colored for selected
-    if (i == selected) {
-      glColor3f(((float) red / MAX_COLOR), ((float) green / MAX_COLOR), ((float) blue / MAX_COLOR));
-    }
-    else {
-      glColor3f(1, 1, 1);
-    }
-
-    // Draw the object
-    draw_object(curr);
-
-    // Draw the wireframe on selected objects
-    if (i == selected) {
-      // Switch to line mode
-      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-      // Draw red lines
-      glColor3f(1, 0, 0);
-      draw_object(curr);
-
-      // Switch back to fill mode
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-
-    glPopName();
-
-    curr = curr->next;
-    i++;
-  }
-  printf("Rendered %d objects\n", i);
+void trackXYCB(int id) {
+	printf("Tracking the scene/camera\n");
 }
 
-/**
- * display_cb - the display callback, called to draw the scene. Clears
- * the scene, draws the objects then flushes and swaps the bufers.
- */
-void display_cb()
+
+void textCB(int id)
 {
-  glClear(GL_COLOR_BUFFER_BIT  | GL_DEPTH_BUFFER_BIT);
-  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-  draw_objects();
-  glFlush();
-  glutSwapBuffers();
+	glui->sync_live ();
+	glutPostRedisplay ();
 }
 
-/**
- * reshape_cb - called when the window is reshaped, updates the viewport
- * and projection then redraws the scene.
- */
-void reshape_cb (int x, int y)
+void buttonCB(int control)
 {
-  // Update the viewport
-  glViewport(0, 0, x, y);
-
-  // Set up the projection matrix
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  update_projection();
-
-  // Set up the modelview matrix
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
+	Objects.push_back(Object());
+	printf("Loading %s\n", objFileNameTextField->get_text());
+	loadObj((char *)objFileNameTextField->get_text(), Objects.back());
+	glui->sync_live ();
+	glutPostRedisplay ();
 }
 
-/**
- * mouse_cb - called on mouse clicks, updates the global 'selected'
- * ID to reflect which object was clicked, then redraws the scene.
- */
-void mouse_cb (int button, int state, int x, int y)
+void colorCB(int id)
 {
-  int hits, i, names;
-  GLuint selectBuf[SBUF_SIZE] = {0};
-  GLuint min, *cur;
-  GLint viewport[4];
-
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-    // Get the viewport parameters
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glSelectBuffer(SBUF_SIZE, selectBuf);
-
-    // Go into selection mode and set up the projection and modeliew matrices
-    glRenderMode(GL_SELECT);
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-
-    gluPickMatrix(x, (viewport[3] - y), 2, 2, viewport);
-    update_projection();
-
-    glMatrixMode(GL_MODELVIEW);
-
-    // Set up the names stack then draw the scene
-    glInitNames();
-    draw_objects();
-
-    // Restore render mode and associated matrices
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glFlush();
-
-    hits = glRenderMode(GL_RENDER);
-
-    printf("%d hits\n", hits);
-
-    min = MAXD;
-    cur = selectBuf;
-
-    // Find which object was hit if one was
-    if (hits > 0) {
-      for (i = 0; i < hits; i++) {
-        names = *cur;
-
-        if (*(cur + 1) < min) {
-          min = *(cur + 1);
-          if (names > 0) {
-            selected = *(cur + 3);
-          }
-        }
-
-        cur += (3 + names);
-      }
-    }
-    // Otherwise no objects are selected
-    else {
-      selected = -1;
-    }
-
-    // Redraw the scene to update color/wireframe
-    glutPostRedisplay();
-  }
+	glui->sync_live ();
+	if (objSelected != -1)
+	{
+		Objects.at(objSelected).color.r = red;
+		Objects.at(objSelected).color.g = green;
+		Objects.at(objSelected).color.b = blue;
+	}
+	glui->sync_live ();
+	glutPostRedisplay ();
 }
 
-void rotation_cb(int id)
+void drawObjects(GLenum mode)
 {
+
+	for (int i = 0 ; i < (int) Objects.size() ; i++)
+	{
+		if (mode == GL_SELECT)
+			glLoadName(i);
+		
+		if (mode == GL_RENDER)
+			glColor3f (Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
+
+		glCallList(Objects.at(i).displayList);
+
+		if ((mode == GL_RENDER) && (objSelected == i))
+		{
+			glDisable (GL_LIGHTING);
+			glEnable (GL_POLYGON_OFFSET_LINE);
+			glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+
+			glColor3f (1.f - Objects.at(i).color.r, 1.f - Objects.at(i).color.g, 1.f - Objects.at(i).color.b);
+			glCallList (Objects.at(i).displayList);
+
+			glEnable (GL_LIGHTING);
+			glDisable (GL_POLYGON_OFFSET_LINE);
+			glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+		}
+	}
 }
 
-void translate_xy_cb(int id)
+void setupVV()
 {
+		glMatrixMode (GL_PROJECTION);
+		glLoadIdentity ();
+	
+		if (projType == ORTHO)
+			glOrtho(vl, vr, vb, vt, vn, vf);
+		else
+			glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
 }
 
-void translate_z_cb(int id)
+
+
+void myGlutDisplay(void)
 {
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	/* The next 3 lines are temporary to make sure the objects show up in the
+	 * view volume when you load them. You will need to modify this
+	 */
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0.f, 0.f, -2.f);
+	
+	drawObjects(GL_RENDER);
+	glutSwapBuffers();
 }
 
-void scale_cb(int id)
+
+void myGlutReshape(int x, int y)
 {
+	sizeX = x;
+	sizeY = y;
+	glViewport(0, 0, sizeX, sizeY);
+
+	if(sizeX <= sizeY)
+	{
+		vb = vl * sizeY / sizeX;
+		vt = vr * sizeY / sizeX;
+	}
+	else
+	{
+		vl = vb * sizeX / sizeY;
+		vr = vt * sizeX / sizeY;
+	}
+
+	setupVV ();
+
+	glutPostRedisplay ();
 }
 
-void cam_rotation_cb(int id)
+void myGlutMouse (int button, int button_state, int x, int y)
 {
+	GLuint selectBuffer[512];
+	GLint viewport[4];
+
+	if(button != GLUT_LEFT_BUTTON || button_state != GLUT_DOWN)
+		return;
+
+	glGetIntegerv(GL_VIEWPORT, viewport);
+
+	glSelectBuffer(512, selectBuffer);
+	glRenderMode(GL_SELECT);
+
+	glInitNames();
+	glPushName(-1);
+
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+
+	gluPickMatrix((GLdouble) x, (GLdouble) (viewport[3]-y), 2.0, 2.0, viewport);
+
+	if (projType == ORTHO)
+		glOrtho(vl, vr, vb, vt, vn, vf);
+	else
+		glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
+
+	drawObjects(GL_SELECT);
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glFlush();
+
+	processHits( glRenderMode(GL_RENDER), selectBuffer);
+
+	glutPostRedisplay();
 }
 
-void track_xy_cb(int id)
+void processHits(GLint hits, GLuint buffer[])
 {
+	int pick = -1;
+	unsigned int min_depth = 4294967295;
+	GLuint *ptr = (GLuint *) buffer;
+
+	cout << "Number of hits = " << hits << endl;
+	for(int i = 0 ; i < hits ; i++, ptr+=4)
+	{
+		if (*(ptr+1) < min_depth)
+		{
+			min_depth = *(ptr+1);
+			pick = *(ptr+3);
+		}
+	}
+
+	objSelected = pick;
+
+	if (pick != -1)
+	{
+		cout << "We got ourselves a winner: #" << pick << endl;
+		red = Objects.at(pick).color.r;
+		green = Objects.at(pick).color.g;
+		blue = Objects.at(pick).color.b;
+	}
+	else
+	{
+		red = 1.f;
+		green = 1.f;
+		blue = 1.f;
+	}
+	glui->sync_live ();
 }
 
-void dolly_cb(int id)
+void initScene()
 {
-}
+	float light0_pos[]	=	{0.f, 3.f, 2.f, 1.f};
+	float diffuse0[]	=	{1.f, 1.f, 1.f, .5f};
+	float ambient0[]	=	{.1f, .1f, .1f, 1.f};
+	float specular0[]	=	{1.f, 1.f, 1.f, .5f};
 
-void init_scene()
-{
-  // This stuff is for lighting and materials. We'll learn more about
-  // it later.
-  float light0_pos[] = {0.0, 3.0, 0.0, 1.0};
-  float diffuse0[] = {1.0, 1.0, 1.0, 0.5};
-  float ambient0[] = {0.1, 0.1, 0.1, 1.0};
-  float specular0[] = {1.0, 1.0, 1.0, 0.5};
-
-  glEnable(GL_LIGHTING);
-  glEnable(GL_LIGHT0);
-  glShadeModel(GL_SMOOTH);
-  glEnable(GL_COLOR_MATERIAL);
-  glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
-  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
-  glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
-  glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
-
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_POLYGON_OFFSET_LINE);
-  glPolygonOffset(0, WIREFRAME_OFFSET);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_COLOR_MATERIAL);
+	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
+	glEnable (GL_DEPTH_TEST);
+	
+	setupVV();
 }
 
 int main(int argc, char **argv)
 {
-  // setup glut
-  glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-  glutInitWindowPosition(50, 50);
-  glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+	glutInitWindowPosition( 50, 50 );
+	glutInitWindowSize( WIN_WIDTH, WIN_HEIGHT);
 
-  // Create the GUI window
-  main_window = glutCreateWindow("OBJ Loader");
-  glutDisplayFunc(display_cb);
-  glutReshapeFunc(reshape_cb);
-  glutMouseFunc(mouse_cb);
+	main_window = glutCreateWindow( "OBJ Loader" );
+	glutDisplayFunc( myGlutDisplay );
+	glutReshapeFunc(myGlutReshape);
+	glutMouseFunc( myGlutMouse );
 
-  // Initialize OpenGL
-  init_scene();
+	initScene();
 
-  glui = GLUI_Master.create_glui("OBJ Loader GUI", 0);
+	glui = GLUI_Master.create_glui( "OBJ Loader GUI", 0, 600, 50 );
 
-  // Object Loading Panel
-  GLUI_Panel *objPanel = glui->add_panel("Obj Files");
-  objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:", GLUI_EDITTEXT_TEXT, 0, OBJ_TEXTFIELD, text_cb);
-  glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, button_cb);
+	GLUI_Panel *objPanel = glui->add_panel("Obj Files");
+	objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:",GLUI_EDITTEXT_TEXT,0,OBJ_TEXTFIELD,textCB);
+	
+	glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, buttonCB);
 
-  glui->add_separator();
+	glui->add_separator();
 
-  // Projection Type Panel
-  GLUI_Panel *projPanel = glui->add_panel("Projection");
-  GLUI_RadioGroup *projGroup = glui->add_radiogroup_to_panel(projPanel, &projType, -1, projection_cb);
-  glui->add_radiobutton_to_group(projGroup, "Orthographic");
-  glui->add_radiobutton_to_group(projGroup, "Perspective");
-  GLUI_Spinner *fovSpinner =glui->add_spinner_to_panel(projPanel, "FOV", GLUI_SPINNER_INT, &fov, FOV, projection_cb);
-  fovSpinner->set_int_limits(0, 90, GLUI_LIMIT_CLAMP);
+	GLUI_Panel *transformationsPanel = glui->add_panel ("Object Transformation Mode");
+	GLUI_RadioGroup *transGroup = glui->add_radiogroup_to_panel(transformationsPanel, (int *)&transType, -1, transCB);
+	glui->add_radiobutton_to_group(transGroup, "Translation");
+	glui->add_radiobutton_to_group(transGroup, "Rotation");
+	glui->add_radiobutton_to_group(transGroup, "Scale");
 
-  // Object Transformations Panel
-  GLUI_Panel *transformsPanel = glui->add_panel("Object Transformations");
-  GLUI_Rotation *rotationManip = glui->add_rotation_to_panel(transformsPanel, "Rotation", rotMat, ROTATION,rotation_cb);
-  rotationManip->reset();
-  glui->add_column_to_panel(transformsPanel, true);
-  GLUI_Translation *translateXYManip = glui->add_translation_to_panel(transformsPanel, "Translate XY", GLUI_TRANSLATION_XY, xyTrans, TRANSLATIONXY, translate_xy_cb);
-  glui->add_column_to_panel(transformsPanel, true);
-  GLUI_Translation *translateZManip = glui->add_translation_to_panel(transformsPanel, "Translate Z", GLUI_TRANSLATION_Z, &zTrans, TRANSLATIONZ, translate_z_cb);
-  glui->add_column_to_panel(transformsPanel, true);
-  GLUI_Spinner *scaleSpinner = glui->add_spinner_to_panel(transformsPanel, "Scale", GLUI_SPINNER_FLOAT, &objScale, SCALE, scale_cb);
-  scaleSpinner->set_float_limits(0, 2.0, GLUI_LIMIT_CLAMP);
+	
+	glui->add_separator ();
+	GLUI_Panel *cameraPanel = glui->add_panel("Camera Manipulation Mode");
+	GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE,camRotationCB);
+	camRotationManip->reset();
+	glui->add_column_to_panel(cameraPanel, true);
+	GLUI_Translation *trackXYManip = glui->add_translation_to_panel(cameraPanel, "Track XY", GLUI_TRANSLATION_XY, camTrack, TRACK, trackXYCB);
+	glui->add_column_to_panel(cameraPanel, true);
+	GLUI_Translation *dollyManip = glui->add_translation_to_panel(cameraPanel, "Dolly", GLUI_TRANSLATION_Z, &camDolly, DOLLY, dollyCB);
+	glui->add_separator ();
 
-  // Camera Manipulation Panel
-  GLUI_Panel *cameraPanel = glui->add_panel("Camera Manipulation Mode");
-  GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE,cam_rotation_cb);
-  camRotationManip->reset();
-  glui->add_column_to_panel(cameraPanel, true);
-  GLUI_Translation *trackXYManip = glui->add_translation_to_panel(cameraPanel, "Track XY", GLUI_TRANSLATION_XY, camTrack, TRACK, track_xy_cb);
-  glui->add_column_to_panel(cameraPanel, true);
-  GLUI_Translation *dollyManip = glui->add_translation_to_panel(cameraPanel, "Dolly", GLUI_TRANSLATION_Z, &camDolly, DOLLY, dolly_cb);
+	
+	GLUI_Panel *projPanel = glui->add_panel("Projection");
+	GLUI_RadioGroup *projGroup = glui->add_radiogroup_to_panel(projPanel, (int *)&projType, -1, projCB);
+	glui->add_radiobutton_to_group(projGroup, "Orthographic");
+	glui->add_radiobutton_to_group(projGroup, "Perspective");
+	GLUI_Spinner *fovSpinner = glui->add_spinner_to_panel(projPanel, "FOV", GLUI_SPINNER_INT, &fov, FOV, fovCB);
+	fovSpinner->set_int_limits(FOVMIN, FOVMAX);
 
-  // Object Color Panel
-  GLUI_Panel *colorPanel = glui->add_panel("Color");
-  GLUI_Spinner *redValue = glui->add_spinner_to_panel(colorPanel, "Red", 2, &red, RED, color_cb);
-  redValue->set_int_limits(0, MAX_COLOR);
-  GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", 2, &green, GREEN, color_cb);
-  greenValue->set_int_limits(0, MAX_COLOR);
-  GLUI_Spinner *blueValue = glui->add_spinner_to_panel(colorPanel, "Blue", 2, &blue, BLUE, color_cb);
-  blueValue->set_int_limits(0, MAX_COLOR);
-  glui->set_main_gfx_window(main_window);
+	GLUI_Panel *colorPanel = glui->add_panel("Color");
+	GLUI_Spinner *redValue = glui->add_spinner_to_panel(colorPanel, "Red", GLUI_SPINNER_FLOAT, &red, RED, colorCB);
+	redValue->set_float_limits(0.f, 1.f);
 
-  GLUI_Master.set_glutIdleFunc(NULL);
-  glui->sync_live();
+	GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", GLUI_SPINNER_FLOAT, &green,GREEN, colorCB);
+	greenValue->set_float_limits(0.f, 1.f);
 
-  glutMainLoop();
-  return EXIT_SUCCESS;
+	GLUI_Spinner *blueValue = glui->add_spinner_to_panel(colorPanel, "Blue", GLUI_SPINNER_FLOAT, &blue, BLUE, colorCB);
+	blueValue->set_float_limits(0.f, 1.f);
+
+	glui->set_main_gfx_window( main_window );
+
+	// We register the idle callback with GLUI, *not* with GLUT
+	GLUI_Master.set_glutIdleFunc( NULL );
+	glui->sync_live();
+	glutMainLoop();
+	return EXIT_SUCCESS;
 }
