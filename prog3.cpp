@@ -271,7 +271,8 @@ void projCB(int id)
 
 void fovCB(int id)
 {
-	printf("Updating the fov\n");
+	setupVV();
+	glutPostRedisplay();
 }
 
 void camRotationCB(int id) {
@@ -334,7 +335,7 @@ void drawObjects(GLenum mode)
 			glEnable (GL_POLYGON_OFFSET_LINE);
 			glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
 
-			glColor3f (1.f - Objects.at(i).color.r, 1.f - Objects.at(i).color.g, 1.f - Objects.at(i).color.b);
+			glColor3f (1.f, 0, 0);
 			glCallList (Objects.at(i).displayList);
 
 			glEnable (GL_LIGHTING);
