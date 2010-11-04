@@ -18,6 +18,9 @@
 #include <fstream>
 #include <iostream>
 
+#define WIREFRAME_OFFSET -10
+#define BACKGROUND_COLOR 0.5, 0.5, 0.5, 1.0
+
 using namespace std;
 
 /************************************************************************/
@@ -485,6 +488,8 @@ void initScene()
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 	glEnable(GL_DEPTH_TEST);
+	glClearColor(BACKGROUND_COLOR);
+	glPolygonOffset(0, WIREFRAME_OFFSET);
 	
 	setupVV();
 }
