@@ -38,7 +38,8 @@ typedef struct Object
 {
 	Color color;
 	string name;
-	float (*normals)[3], (*vertices)[3];
+	float (*normals)[3];
+	float (*vertices)[3];
 	Point (*faces)[3];
 	int numVertices, numNormals, numFaces;
 	GLuint displayList;
@@ -65,7 +66,7 @@ void	colorCB			(int);
 void	drawObjects		(GLenum);
 void	myGlutDisplay	(void);
 void	myGlutReshape	(int, int);
-void	myGlutMouse		(int , int , int , int );
+void	myGlutMouse		(int , int , int , int);
 void	processHits		(GLint, GLuint[]);
 void	initScene		();
 
@@ -116,12 +117,12 @@ GLUI_String fileName = GLUI_String("frog.obj");
 /// Reads the contents of the obj file and appends the data at the end of
 /// the vector of Objects. This time we allow the same object to be loaded
 /// several times.
-int loadObj (char *fileName, Object &obj)
+int loadObj(char *fileName, Object &obj)
 {
 	ifstream file;
-	file.open (fileName);
+	file.open(fileName);
 
-	if(!file.is_open ())
+	if (!file.is_open())
 	{
 		cerr << "Cannot open .obj file " << fileName << endl;
 		return EXIT_FAILURE;
@@ -162,7 +163,7 @@ int loadObj (char *fileName, Object &obj)
 	obj.numFaces = numFaces;
 
 	file.clear();
-	file.seekg (ios::beg);
+	file.seekg(ios::beg);
 	
 	/// Second pass: populate the arrays
 	numFaces = numNormals = numVertices = 0;
@@ -208,25 +209,25 @@ int loadObj (char *fileName, Object &obj)
 
 	/// Now we generate the display list.
 	obj.displayList = glGenLists(1);
-	glMatrixMode (GL_MODELVIEW);
-	glLoadIdentity ();
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 	glNewList(obj.displayList, GL_COMPILE);
 	{
-		glBegin (GL_TRIANGLES);
+		glBegin(GL_TRIANGLES);
 		{
 			for (int faceNum = 0 ; faceNum < obj.numFaces ; faceNum++)
 			{
-				glNormal3fv (obj.normals[obj.faces[faceNum][0].n-1]);
-				glVertex3fv (obj.vertices[obj.faces[faceNum][0].v-1]);
-				glNormal3fv (obj.normals[obj.faces[faceNum][1].n-1]);
-				glVertex3fv (obj.vertices[obj.faces[faceNum][1].v-1]);
-				glNormal3fv (obj.normals[obj.faces[faceNum][2].n-1]);
-				glVertex3fv (obj.vertices[obj.faces[faceNum][2].v-1]);
+				glNormal3fv(obj.normals[obj.faces[faceNum][0].n - 1]);
+				glVertex3fv(obj.vertices[obj.faces[faceNum][0].v - 1]);
+				glNormal3fv(obj.normals[obj.faces[faceNum][1].n - 1]);
+				glVertex3fv(obj.vertices[obj.faces[faceNum][1].v - 1]);
+				glNormal3fv(obj.normals[obj.faces[faceNum][2].n - 1]);
+				glVertex3fv(obj.vertices[obj.faces[faceNum][2].v - 1]);
 			}
 		}
-		glEnd ();
+		glEnd();
 	}
-	glEndList ();
+	glEndList();
 
 	return EXIT_SUCCESS;
 }
@@ -246,8 +247,8 @@ void transCB(int id)
 			break;
 		default:break;
 	}
-	glui->sync_live ();
-	glutPostRedisplay ();
+	glui->sync_live();
+	glutPostRedisplay();
 }
 
 void projCB(int id)
@@ -265,8 +266,8 @@ void projCB(int id)
 		}
 	setupVV();
 	
-	glui->sync_live ();
-	glutPostRedisplay ();
+	glui->sync_live();
+	glutPostRedisplay();
 }
 
 void fovCB(int id)
@@ -290,8 +291,8 @@ void trackXYCB(int id) {
 
 void textCB(int id)
 {
-	glui->sync_live ();
-	glutPostRedisplay ();
+	glui->sync_live();
+	glutPostRedisplay();
 }
 
 void buttonCB(int control)
@@ -299,21 +300,21 @@ void buttonCB(int control)
 	Objects.push_back(Object());
 	printf("Loading %s\n", objFileNameTextField->get_text());
 	loadObj((char *)objFileNameTextField->get_text(), Objects.back());
-	glui->sync_live ();
-	glutPostRedisplay ();
+	glui->sync_live();
+	glutPostRedisplay();
 }
 
 void colorCB(int id)
 {
-	glui->sync_live ();
+	glui->sync_live();
 	if (objSelected != -1)
 	{
 		Objects.at(objSelected).color.r = red;
 		Objects.at(objSelected).color.g = green;
 		Objects.at(objSelected).color.b = blue;
 	}
-	glui->sync_live ();
-	glutPostRedisplay ();
+	glui->sync_live();
+	glutPostRedisplay();
 }
 
 void drawObjects(GLenum mode)
@@ -325,30 +326,30 @@ void drawObjects(GLenum mode)
 			glLoadName(i);
 		
 		if (mode == GL_RENDER)
-			glColor3f (Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
+			glColor3f(Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
 
 		glCallList(Objects.at(i).displayList);
 
 		if ((mode == GL_RENDER) && (objSelected == i))
 		{
-			glDisable (GL_LIGHTING);
-			glEnable (GL_POLYGON_OFFSET_LINE);
-			glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+			glDisable(GL_LIGHTING);
+			glEnable(GL_POLYGON_OFFSET_LINE);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-			glColor3f (1.f, 0, 0);
-			glCallList (Objects.at(i).displayList);
+			glColor3f(1.f, 0, 0);
+			glCallList(Objects.at(i).displayList);
 
-			glEnable (GL_LIGHTING);
-			glDisable (GL_POLYGON_OFFSET_LINE);
-			glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+			glEnable(GL_LIGHTING);
+			glDisable(GL_POLYGON_OFFSET_LINE);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 	}
 }
 
 void setupVV()
 {
-		glMatrixMode (GL_PROJECTION);
-		glLoadIdentity ();
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
 	
 		if (projType == ORTHO)
 			glOrtho(vl, vr, vb, vt, vn, vf);
@@ -360,7 +361,7 @@ void setupVV()
 
 void myGlutDisplay(void)
 {
-	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	/* The next 3 lines are temporary to make sure the objects show up in the
 	 * view volume when you load them. You will need to modify this
@@ -380,7 +381,7 @@ void myGlutReshape(int x, int y)
 	sizeY = y;
 	glViewport(0, 0, sizeX, sizeY);
 
-	if(sizeX <= sizeY)
+	if (sizeX <= sizeY)
 	{
 		vb = vl * sizeY / sizeX;
 		vt = vr * sizeY / sizeX;
@@ -391,17 +392,17 @@ void myGlutReshape(int x, int y)
 		vr = vt * sizeX / sizeY;
 	}
 
-	setupVV ();
+	setupVV();
 
-	glutPostRedisplay ();
+	glutPostRedisplay();
 }
 
-void myGlutMouse (int button, int button_state, int x, int y)
+void myGlutMouse(int button, int button_state, int x, int y)
 {
 	GLuint selectBuffer[512];
 	GLint viewport[4];
 
-	if(button != GLUT_LEFT_BUTTON || button_state != GLUT_DOWN)
+	if (button != GLUT_LEFT_BUTTON || button_state != GLUT_DOWN)
 		return;
 
 	glGetIntegerv(GL_VIEWPORT, viewport);
@@ -429,7 +430,7 @@ void myGlutMouse (int button, int button_state, int x, int y)
 	glPopMatrix();
 	glFlush();
 
-	processHits( glRenderMode(GL_RENDER), selectBuffer);
+	processHits(glRenderMode(GL_RENDER), selectBuffer);
 
 	glutPostRedisplay();
 }
@@ -465,7 +466,7 @@ void processHits(GLint hits, GLuint buffer[])
 		green = 1.f;
 		blue = 1.f;
 	}
-	glui->sync_live ();
+	glui->sync_live();
 }
 
 void initScene()
@@ -483,7 +484,7 @@ void initScene()
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
-	glEnable (GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 	
 	setupVV();
 }
@@ -492,41 +493,41 @@ int main(int argc, char **argv)
 {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowPosition( 50, 50 );
-	glutInitWindowSize( WIN_WIDTH, WIN_HEIGHT);
+	glutInitWindowPosition(50, 50);
+	glutInitWindowSize(WIN_WIDTH, WIN_HEIGHT);
 
-	main_window = glutCreateWindow( "OBJ Loader" );
-	glutDisplayFunc( myGlutDisplay );
+	main_window = glutCreateWindow("OBJ Loader");
+	glutDisplayFunc(myGlutDisplay);
 	glutReshapeFunc(myGlutReshape);
-	glutMouseFunc( myGlutMouse );
+	glutMouseFunc(myGlutMouse);
 
 	initScene();
 
-	glui = GLUI_Master.create_glui( "OBJ Loader GUI", 0, 600, 50 );
+	glui = GLUI_Master.create_glui("OBJ Loader GUI", 0, 600, 50);
 
 	GLUI_Panel *objPanel = glui->add_panel("Obj Files");
-	objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:",GLUI_EDITTEXT_TEXT,0,OBJ_TEXTFIELD,textCB);
+	objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:", GLUI_EDITTEXT_TEXT, 0, OBJ_TEXTFIELD, textCB);
 	
 	glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, buttonCB);
 
 	glui->add_separator();
 
-	GLUI_Panel *transformationsPanel = glui->add_panel ("Object Transformation Mode");
+	GLUI_Panel *transformationsPanel = glui->add_panel("Object Transformation Mode");
 	GLUI_RadioGroup *transGroup = glui->add_radiogroup_to_panel(transformationsPanel, (int *)&transType, -1, transCB);
 	glui->add_radiobutton_to_group(transGroup, "Translation");
 	glui->add_radiobutton_to_group(transGroup, "Rotation");
 	glui->add_radiobutton_to_group(transGroup, "Scale");
 
 	
-	glui->add_separator ();
+	glui->add_separator();
 	GLUI_Panel *cameraPanel = glui->add_panel("Camera Manipulation Mode");
-	GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE,camRotationCB);
+	GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE, camRotationCB);
 	camRotationManip->reset();
 	glui->add_column_to_panel(cameraPanel, true);
 	GLUI_Translation *trackXYManip = glui->add_translation_to_panel(cameraPanel, "Track XY", GLUI_TRANSLATION_XY, camTrack, TRACK, trackXYCB);
 	glui->add_column_to_panel(cameraPanel, true);
 	GLUI_Translation *dollyManip = glui->add_translation_to_panel(cameraPanel, "Dolly", GLUI_TRANSLATION_Z, &camDolly, DOLLY, dollyCB);
-	glui->add_separator ();
+	glui->add_separator();
 
 	
 	GLUI_Panel *projPanel = glui->add_panel("Projection");
@@ -540,16 +541,16 @@ int main(int argc, char **argv)
 	GLUI_Spinner *redValue = glui->add_spinner_to_panel(colorPanel, "Red", GLUI_SPINNER_FLOAT, &red, RED, colorCB);
 	redValue->set_float_limits(0.f, 1.f);
 
-	GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", GLUI_SPINNER_FLOAT, &green,GREEN, colorCB);
+	GLUI_Spinner *greenValue = glui->add_spinner_to_panel(colorPanel, "Green", GLUI_SPINNER_FLOAT, &green, GREEN, colorCB);
 	greenValue->set_float_limits(0.f, 1.f);
 
 	GLUI_Spinner *blueValue = glui->add_spinner_to_panel(colorPanel, "Blue", GLUI_SPINNER_FLOAT, &blue, BLUE, colorCB);
 	blueValue->set_float_limits(0.f, 1.f);
 
-	glui->set_main_gfx_window( main_window );
+	glui->set_main_gfx_window(main_window);
 
 	// We register the idle callback with GLUI, *not* with GLUT
-	GLUI_Master.set_glutIdleFunc( NULL );
+	GLUI_Master.set_glutIdleFunc(NULL);
 	glui->sync_live();
 	glutMainLoop();
 	return EXIT_SUCCESS;
