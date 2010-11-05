@@ -323,10 +323,10 @@ void colorCB(int id)
 void drawObjects(GLenum mode)
 {
 
-	for (int i = 0 ; i < (int) Objects.size() ; i++)
+	for (int i = 0; i < (int) Objects.size(); i++)
 	{
 		if (mode == GL_SELECT)
-			glLoadName(i);
+			glLoadName(i + 3);
 		
 		if (mode == GL_RENDER)
 			glColor3f(Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
@@ -334,16 +334,106 @@ void drawObjects(GLenum mode)
 		if ((mode == GL_SELECT) || ((mode == GL_RENDER) && (objSelected !=i)))
 			glCallList(Objects.at(i).displayList);
 
-		if ((mode == GL_RENDER) && (objSelected == i))
+		if (objSelected == i)
 		{
 			glDisable(GL_LIGHTING);
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-			glColor3f(1.f, 0, 0);
-			glCallList(Objects.at(i).displayList);
+			if (mode == GL_RENDER) {
+				// Draw the wire frame
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				glColor3f(1.f, 0, 0);
+				glCallList(Objects.at(i).displayList);
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+				// Draw the object's axes
+				glLineWidth(3);
+				glBegin(GL_LINES);
+				{
+					// X Axis - Red
+					glColor3f(1.0, 0.0, 0.0);
+					glVertex3f(0.0, 0.0, 0.0);
+					glVertex3f(1.0, 0.0, 0.0);
+
+					// Y Axis - Green
+					glColor3f(0.0, 1.0, 0.0);
+					glVertex3f(0.0, 0.0, 0.0);
+					glVertex3f(0.0, 1.0, 0.0);
+
+					// Z Axis - Blue
+					glColor3f(0.0, 0.0, 1.0);
+					glVertex3f(0.0, 0.0, 0.0);
+					glVertex3f(0.0, 0.0, 1.0);
+				}
+				glEnd();
+				glLineWidth(1);
+			}
+
+			// Draw the manipulators
+			glBegin(GL_TRIANGLES);
+			{
+				// X Axis - Red
+				glLoadName(0);
+				glColor3f(1.0, 0.0, 0.0);
+
+				glVertex3f(1.1, 0.0, 0.0);
+				glVertex3f(1.0, -.02, .02);
+				glVertex3f(1.0, .02, .02);
+
+				glVertex3f(1.1, 0.0, 0.0);
+				glVertex3f(1.0, -.02, -.02);
+				glVertex3f(1.0, .02, -.02);
+
+				glVertex3f(1.1, 0.0, 0.0);
+				glVertex3f(1.0, .02, -.02);
+				glVertex3f(1.0, .02, .02);
+
+				glVertex3f(1.1, 0.0, 0.0);
+				glVertex3f(1.0, -.02, -.02);
+				glVertex3f(1.0, -.02, .02);
+
+				// Y Axis - Green
+				glLoadName(1);
+				glColor3f(0.0, 1.0, 0.0);
+
+				glVertex3f(0.0, 1.1, 0.0);
+				glVertex3f(.02, 1.0, .02);
+				glVertex3f(.02, 1.0, -.02);
+
+				glVertex3f(0.0, 1.1, 0.0);
+				glVertex3f(-.02, 1.0, .02);
+				glVertex3f(-.02, 1.0, -.02);
+
+				glVertex3f(0.0, 1.1, 0.0);
+				glVertex3f(.02, 1.0, .02);
+				glVertex3f(-.02, 1.0, .02);
+
+				glVertex3f(0.0, 1.1, 0.0);
+				glVertex3f(.02, 1.0, -.02);
+				glVertex3f(-.02, 1.0, -.02);
+
+				// Z Axis - Blue
+				glLoadName(2);
+				glColor3f(0.0, 0.0, 1.0);
+
+				glVertex3f(0.0, 0.0, 1.1);
+				glVertex3f(.02, .02, 1.0);
+				glVertex3f(.02, -.02, 1.0);
+
+				glVertex3f(0.0, 0.0, 1.1);
+				glVertex3f(-.02, .02, 1.0);
+				glVertex3f(-.02, -.02, 1.0);
+
+				glVertex3f(0.0, 0.0, 1.1);
+				glVertex3f(.02, .02, 1.0);
+				glVertex3f(-.02, .02, 1.0);
+
+				glVertex3f(0.0, 0.0, 1.1);
+				glVertex3f(.02, -.02, 1.0);
+				glVertex3f(-.02, -.02, 1.0);
+			}
+			glEnd();
 
 			glEnable(GL_LIGHTING);
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 	}
 }
@@ -466,17 +556,15 @@ void processHits(GLint hits, GLuint buffer[])
 		}
 	}
 
-	objSelected = pick;
-
-	if (pick != -1)
-	{
-		cout << "We got ourselves a winner: #" << pick << endl;
-		red = Objects.at(pick).color.r;
-		green = Objects.at(pick).color.g;
-		blue = Objects.at(pick).color.b;
+	if (pick >= 3) {
+		objSelected = pick - 3;
+		cout << "We got ourselves a winner: #" << objSelected << endl;
+		red = Objects.at(objSelected).color.r;
+		green = Objects.at(objSelected).color.g;
+		blue = Objects.at(objSelected).color.b;
 	}
-	else
-	{
+	else if (pick < 0) {
+		objSelected = -1;
 		red = 1.f;
 		green = 1.f;
 		blue = 1.f;
@@ -501,6 +589,7 @@ void initScene()
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
+	glPolygonOffset(0, -10);
 	
 	setupVV();
 }
