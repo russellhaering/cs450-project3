@@ -101,7 +101,7 @@ float vl = -1.f;
 float vr = 1.f;
 float vb = -1.f;
 float vt = 1.f;
-const float vn = .9;
+const float vn = .5;
 const float vf = 10;
 
 float scaleFactor	= 1.f;
@@ -370,7 +370,20 @@ void myGlutDisplay(void)
 	 */
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	glMultMatrixf(camRotMat);
 	glTranslatef(camTrack[0], camTrack[1], camDolly);
+
+	glColor3f(0.0, 0.0, 0.0);
+	glBegin(GL_LINES);
+	{
+		glVertex3f(0.0, 0.0, 20.0);
+		glVertex3f(0.0, 0.0, -20.0);
+		glVertex3f(0.0, 20.0, 0.0);
+		glVertex3f(0.0, -20.0, 0.0);
+		glVertex3f(20.0, 0.0, 0.0);
+		glVertex3f(-20.0, 0.0, 0.0);
+	}
+	glEnd();
 
 	drawObjects(GL_RENDER);
 	glutSwapBuffers();
