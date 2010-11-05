@@ -18,7 +18,6 @@
 #include <fstream>
 #include <iostream>
 
-#define WIREFRAME_OFFSET -10
 #define BACKGROUND_COLOR 0.5, 0.5, 0.5, 1.0
 
 using namespace std;
@@ -103,12 +102,12 @@ float vr = 1.f;
 float vb = -1.f;
 float vt = 1.f;
 const float vn = .9;
-const float vf = 3;
+const float vf = 10;
 
 float scaleFactor	= 1.f;
 float camRotMat[16];
 float camTrack[2] = {0.0, 0.0};
-float camDolly = 0.0;
+float camDolly = -2.0;
 
 GLUI *glui;
 GLUI_EditText *objFileNameTextField;
@@ -284,6 +283,7 @@ void camRotationCB(int id) {
 }
 
 void dollyCB(int id) {
+	glui->sync_live();
 	printf("Dollying the scene/camera\n");
 }
 
@@ -331,19 +331,18 @@ void drawObjects(GLenum mode)
 		if (mode == GL_RENDER)
 			glColor3f(Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
 
-		glCallList(Objects.at(i).displayList);
+		if ((mode == GL_SELECT) || ((mode == GL_RENDER) && (objSelected !=i)))
+			glCallList(Objects.at(i).displayList);
 
 		if ((mode == GL_RENDER) && (objSelected == i))
 		{
 			glDisable(GL_LIGHTING);
-			glEnable(GL_POLYGON_OFFSET_LINE);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 			glColor3f(1.f, 0, 0);
 			glCallList(Objects.at(i).displayList);
 
 			glEnable(GL_LIGHTING);
-			glDisable(GL_POLYGON_OFFSET_LINE);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 	}
@@ -371,8 +370,8 @@ void myGlutDisplay(void)
 	 */
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(0.f, 0.f, -2.f);
-	
+	glTranslatef(camTrack[0], camTrack[1], camDolly);
+
 	drawObjects(GL_RENDER);
 	glutSwapBuffers();
 }
@@ -489,7 +488,6 @@ void initScene()
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
-	glPolygonOffset(0, WIREFRAME_OFFSET);
 	
 	setupVV();
 }
@@ -530,8 +528,10 @@ int main(int argc, char **argv)
 	camRotationManip->reset();
 	glui->add_column_to_panel(cameraPanel, true);
 	GLUI_Translation *trackXYManip = glui->add_translation_to_panel(cameraPanel, "Track XY", GLUI_TRANSLATION_XY, camTrack, TRACK, trackXYCB);
+	trackXYManip->set_speed(.005);
 	glui->add_column_to_panel(cameraPanel, true);
 	GLUI_Translation *dollyManip = glui->add_translation_to_panel(cameraPanel, "Dolly", GLUI_TRANSLATION_Z, &camDolly, DOLLY, dollyCB);
+	dollyManip->set_speed(.005);
 	glui->add_separator();
 
 	
