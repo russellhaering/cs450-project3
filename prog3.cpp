@@ -19,6 +19,7 @@
 #include <iostream>
 
 #define BACKGROUND_COLOR 0.5, 0.5, 0.5, 1.0
+#define LOCAL_AXIS_SIZE 0.5
 
 using namespace std;
 
@@ -336,9 +337,10 @@ void drawObjects(GLenum mode)
 
 		if (objSelected == i)
 		{
-			glDisable(GL_LIGHTING);
 
 			if (mode == GL_RENDER) {
+				glDisable(GL_LIGHTING);
+
 				// Draw the wire frame
 				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 				glColor3f(1.f, 0, 0);
@@ -352,88 +354,49 @@ void drawObjects(GLenum mode)
 					// X Axis - Red
 					glColor3f(1.0, 0.0, 0.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(1.0, 0.0, 0.0);
+					glVertex3f(LOCAL_AXIS_SIZE, 0.0, 0.0);
 
 					// Y Axis - Green
 					glColor3f(0.0, 1.0, 0.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(0.0, 1.0, 0.0);
+					glVertex3f(0.0, LOCAL_AXIS_SIZE, 0.0);
 
 					// Z Axis - Blue
 					glColor3f(0.0, 0.0, 1.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(0.0, 0.0, 1.0);
+					glVertex3f(0.0, 0.0, LOCAL_AXIS_SIZE);
 				}
 				glEnd();
 				glLineWidth(1);
+
+				glEnable(GL_LIGHTING);
 			}
 
-			// Draw the manipulators
-			glBegin(GL_TRIANGLES);
-			{
-				// X Axis - Red
-				glLoadName(0);
-				glColor3f(1.0, 0.0, 0.0);
+			// X Axis - Red
+			glColor3f(1.0, 0.0, 0.0);
+			glPushMatrix();
+			glTranslatef(LOCAL_AXIS_SIZE, 0.0, 0.0);
+			glRotatef(90.0, 0.0, 1.0, 0.0);
+			glLoadName(0);
+			glutSolidCone(.04, .1, 10, 10);
+			glPopMatrix();
 
-				glVertex3f(1.1, 0.0, 0.0);
-				glVertex3f(1.0, -.02, .02);
-				glVertex3f(1.0, .02, .02);
+			// Y Axis - Green
+			glColor3f(0.0, 1.0, 0.0);
+			glPushMatrix();
+			glTranslatef(0.0, LOCAL_AXIS_SIZE, 0.0);
+			glRotatef(-90.0, 1.0, 0.0, 0.0);
+			glLoadName(1);
+			glutSolidCone(.04, .1, 10, 10);
+			glPopMatrix();
 
-				glVertex3f(1.1, 0.0, 0.0);
-				glVertex3f(1.0, -.02, -.02);
-				glVertex3f(1.0, .02, -.02);
-
-				glVertex3f(1.1, 0.0, 0.0);
-				glVertex3f(1.0, .02, -.02);
-				glVertex3f(1.0, .02, .02);
-
-				glVertex3f(1.1, 0.0, 0.0);
-				glVertex3f(1.0, -.02, -.02);
-				glVertex3f(1.0, -.02, .02);
-
-				// Y Axis - Green
-				glLoadName(1);
-				glColor3f(0.0, 1.0, 0.0);
-
-				glVertex3f(0.0, 1.1, 0.0);
-				glVertex3f(.02, 1.0, .02);
-				glVertex3f(.02, 1.0, -.02);
-
-				glVertex3f(0.0, 1.1, 0.0);
-				glVertex3f(-.02, 1.0, .02);
-				glVertex3f(-.02, 1.0, -.02);
-
-				glVertex3f(0.0, 1.1, 0.0);
-				glVertex3f(.02, 1.0, .02);
-				glVertex3f(-.02, 1.0, .02);
-
-				glVertex3f(0.0, 1.1, 0.0);
-				glVertex3f(.02, 1.0, -.02);
-				glVertex3f(-.02, 1.0, -.02);
-
-				// Z Axis - Blue
-				glLoadName(2);
-				glColor3f(0.0, 0.0, 1.0);
-
-				glVertex3f(0.0, 0.0, 1.1);
-				glVertex3f(.02, .02, 1.0);
-				glVertex3f(.02, -.02, 1.0);
-
-				glVertex3f(0.0, 0.0, 1.1);
-				glVertex3f(-.02, .02, 1.0);
-				glVertex3f(-.02, -.02, 1.0);
-
-				glVertex3f(0.0, 0.0, 1.1);
-				glVertex3f(.02, .02, 1.0);
-				glVertex3f(-.02, .02, 1.0);
-
-				glVertex3f(0.0, 0.0, 1.1);
-				glVertex3f(.02, -.02, 1.0);
-				glVertex3f(-.02, -.02, 1.0);
-			}
-			glEnd();
-
-			glEnable(GL_LIGHTING);
+			// Z Axis - Blue
+			glColor3f(0.0, 0.0, 1.0);
+			glPushMatrix();
+			glTranslatef(0.0, 0.0, LOCAL_AXIS_SIZE);
+			glLoadName(2);
+			glutSolidCone(.04, .1, 10, 10);
+			glPopMatrix();
 		}
 	}
 }
@@ -529,6 +492,7 @@ void myGlutMouse(int button, int button_state, int x, int y)
 	else
 		glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
 
+	glMatrixMode(GL_MODELVIEW);
 	drawObjects(GL_SELECT);
 
 	glMatrixMode(GL_PROJECTION);
