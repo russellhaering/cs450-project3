@@ -525,17 +525,17 @@ void updateDrag(int x, int y, bool move) {
 	glGetDoublev(GL_MODELVIEW_MATRIX, mv);
 	glGetDoublev(GL_PROJECTION_MATRIX, pj);
 
-	gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
+	gluUnProject((float) x, (float) (vp[3] - y), 1.0, mv, pj, vp, &vX, &vY, &vZ);
 
-	mRay.p1[0] = camTrack[0];
-	mRay.p1[1] = camTrack[1];
-	mRay.p1[2] = camDolly;
+	mRay.p1[0] = -camTrack[0];
+	mRay.p1[1] = -camTrack[1];
+	mRay.p1[2] = -camDolly;
 
 	mRay.p2[0] = vX;
 	mRay.p2[1] = vY;
 	mRay.p2[2] = vZ;
 
-	oAxis.p1[0] = 1.0;
+	oAxis.p1[0] = 0;
 	oAxis.p1[1] = 0;
 	oAxis.p1[2] = 0;
 
@@ -543,9 +543,10 @@ void updateDrag(int x, int y, bool move) {
 	oAxis.p2[1] = 0;
 	oAxis.p2[2] = 0;
 
+	oAxis.p2[sManip] = 1.0;
+
 	closestApproach(oAxis, mRay, intersect);
 
-	cout << "Projected To: (" << vX << ", " << vY << ", " << vZ << ")" << endl;
 	cout << "Closest To: (" << intersect[0] << ", " << intersect[1] << ", " << intersect[2] << ")" << endl;
 }
 
@@ -583,8 +584,6 @@ void myGlutMouse(int button, int button_state, int x, int y)
 			glFlush();
 
 			processHits(glRenderMode(GL_RENDER), selectBuffer);
-
-			glutPostRedisplay();
 		}
 		else if (button_state == GLUT_UP) {
 			if (sManip >= 0) {
@@ -595,6 +594,7 @@ void myGlutMouse(int button, int button_state, int x, int y)
 	}
 
 	updateDrag(x, y, false);
+	glutPostRedisplay();
 }
 
 void processHits(GLint hits, GLuint buffer[])
