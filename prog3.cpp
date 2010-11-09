@@ -139,7 +139,7 @@ void sub3(float *a, float *b, float *r) {
 // Identifies the closest point on line l1 to line l2
 void closestApproach(Line l1, Line l2, float *point) {
 	float u[3], v[3], w[3], a, b, c, d, e, D, sc;
-	
+
 	sub3(l1.p2, l1.p1, u);
 	sub3(l2.p2, l2.p1, v);
 	sub3(l1.p1, l2.p1, w);
@@ -205,7 +205,7 @@ int loadObj(char *fileName, Object &obj)
 				numFaces++;
 		}
 	};
-	
+
 	obj.vertices = new float [numVertices][3];
 	obj.numVertices = numVertices;
 	obj.normals = new float [numNormals][3];
@@ -215,7 +215,7 @@ int loadObj(char *fileName, Object &obj)
 
 	file.clear();
 	file.seekg(ios::beg);
-	
+
 	/// Second pass: populate the arrays
 	numFaces = numNormals = numVertices = 0;
 	while (getline(file, buffer), !buffer.empty())
@@ -224,7 +224,7 @@ int loadObj(char *fileName, Object &obj)
 		{
 			if (buffer[1] == 'n')
 			{
-				sscanf(	buffer.data() + 2*sizeof(char), " %f %f %f",	
+				sscanf(	buffer.data() + 2*sizeof(char), " %f %f %f",
 							&obj.normals[numNormals][0],
 							&obj.normals[numNormals][1],
 							&obj.normals[numNormals][2]);
@@ -234,7 +234,7 @@ int loadObj(char *fileName, Object &obj)
 			{
 				if (buffer[1] == ' ')
 				{
-					sscanf(	buffer.data() + sizeof(char), " %f %f %f",	
+					sscanf(	buffer.data() + sizeof(char), " %f %f %f",
 								&obj.vertices[numVertices][0],
 								&obj.vertices[numVertices][1],
 								&obj.vertices[numVertices][2]);
@@ -246,7 +246,7 @@ int loadObj(char *fileName, Object &obj)
 		{
 			if (buffer[0] == 'f')
 			{
-				sscanf(	buffer.data() + sizeof(char), " %d//%d %d//%d %d//%d",	
+				sscanf(	buffer.data() + sizeof(char), " %d//%d %d//%d %d//%d",
 							&obj.faces[numFaces][0].v, &obj.faces[numFaces][0].n,
 							&obj.faces[numFaces][1].v, &obj.faces[numFaces][1].n,
 							&obj.faces[numFaces][2].v, &obj.faces[numFaces][2].n);
@@ -316,7 +316,7 @@ void projCB(int id)
 				break;
 		}
 	setupVV();
-	
+
 	glui->sync_live();
 	glutPostRedisplay();
 }
@@ -376,7 +376,7 @@ void drawObjects(GLenum mode)
 	{
 		if (mode == GL_SELECT)
 			glLoadName(i + 3);
-		
+
 		if (mode == GL_RENDER)
 			glColor3f(Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
 
@@ -453,7 +453,7 @@ void setupVV()
 {
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-	
+
 		if (projType == ORTHO)
 			glOrtho(vl, vr, vb, vt, vn, vf);
 		else
@@ -465,7 +465,7 @@ void setupVV()
 void myGlutDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+
 	/* The next 3 lines are temporary to make sure the objects show up in the
 	 * view volume when you load them. You will need to modify this
 	 */
@@ -530,11 +530,11 @@ void updateDrag(int x, int y, bool move) {
 	mRay.p1[0] = camTrack[0];
 	mRay.p1[1] = camTrack[1];
 	mRay.p1[2] = camDolly;
-	
+
 	mRay.p2[0] = vX;
 	mRay.p2[1] = vY;
 	mRay.p2[2] = vZ;
-	
+
 	oAxis.p1[0] = 1.0;
 	oAxis.p1[1] = 0;
 	oAxis.p1[2] = 0;
@@ -651,7 +651,7 @@ void initScene()
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
 	glPolygonOffset(0, -10);
-	
+
 	setupVV();
 }
 
@@ -673,7 +673,7 @@ int main(int argc, char **argv)
 
 	GLUI_Panel *objPanel = glui->add_panel("Obj Files");
 	objFileNameTextField = glui->add_edittext_to_panel(objPanel, "Filename:", GLUI_EDITTEXT_TEXT, 0, OBJ_TEXTFIELD, textCB);
-	
+
 	glui->add_button_to_panel(objPanel, "Load", LOAD_BUTTON, buttonCB);
 
 	glui->add_separator();
@@ -684,7 +684,7 @@ int main(int argc, char **argv)
 	glui->add_radiobutton_to_group(transGroup, "Rotation");
 	glui->add_radiobutton_to_group(transGroup, "Scale");
 
-	
+
 	glui->add_separator();
 	GLUI_Panel *cameraPanel = glui->add_panel("Camera Manipulation Mode");
 	GLUI_Rotation *camRotationManip = glui->add_rotation_to_panel(cameraPanel, "Camera Rotation", camRotMat, CAMROTATE, camRotationCB);
@@ -697,7 +697,7 @@ int main(int argc, char **argv)
 	dollyManip->set_speed(.005);
 	glui->add_separator();
 
-	
+
 	GLUI_Panel *projPanel = glui->add_panel("Projection");
 	GLUI_RadioGroup *projGroup = glui->add_radiogroup_to_panel(projPanel, (int *)&projType, -1, projCB);
 	glui->add_radiobutton_to_group(projGroup, "Orthographic");
