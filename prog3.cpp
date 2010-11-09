@@ -527,13 +527,27 @@ void updateDrag(int x, int y, bool move) {
 
 	gluUnProject((float) x, (float) (vp[3] - y), 1.0, mv, pj, vp, &vX, &vY, &vZ);
 
-	mRay.p1[0] = -camTrack[0];
-	mRay.p1[1] = -camTrack[1];
-	mRay.p1[2] = -camDolly;
-
 	mRay.p2[0] = vX;
 	mRay.p2[1] = vY;
 	mRay.p2[2] = vZ;
+
+	/* In perspective mode, the "mouse ray" comes from the location of the camera.
+	 * In orthographic mode, however, the camera is a plane instead of a point, so
+	 * we "cheat" and project a second point at a different depth along the same
+	 * "mouse ray" to form a line.
+	 */
+	if (projType == ORTHO) {
+		gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
+
+		mRay.p1[0] = vX;
+		mRay.p1[1] = vY;
+		mRay.p1[2] = vZ;
+	}
+	else {
+		mRay.p1[0] = -camTrack[0];
+		mRay.p1[1] = -camTrack[1];
+		mRay.p1[2] = -camDolly;
+	}
 
 	oAxis.p1[0] = 0;
 	oAxis.p1[1] = 0;
@@ -584,16 +598,20 @@ void myGlutMouse(int button, int button_state, int x, int y)
 			glFlush();
 
 			processHits(glRenderMode(GL_RENDER), selectBuffer);
+
+			if (sManip >= 0) {
+				updateDrag(x, y, false);
+			}
 		}
 		else if (button_state == GLUT_UP) {
 			if (sManip >= 0) {
+				updateDrag(x, y, true);
 				cout << "Released Manipulator: " << sManip << endl;
 			}
 			sManip = -1;
 		}
 	}
 
-	updateDrag(x, y, false);
 	glutPostRedisplay();
 }
 
