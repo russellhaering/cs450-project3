@@ -630,6 +630,14 @@ void myGlutMouse(int button, int button_state, int x, int y)
 	glutPostRedisplay();
 }
 
+void glutMotionCB(int x, int y) {
+	if (sManip >= 0) {
+		updateDrag(x, y, true);
+	}
+
+	glutPostRedisplay();
+}
+
 void processHits(GLint hits, GLuint buffer[])
 {
 	int pick = -1;
@@ -699,6 +707,7 @@ int main(int argc, char **argv)
 	glutDisplayFunc(myGlutDisplay);
 	glutReshapeFunc(myGlutReshape);
 	glutMouseFunc(myGlutMouse);
+	glutMotionFunc(glutMotionCB);
 
 	initScene();
 
