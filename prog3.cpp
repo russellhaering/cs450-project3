@@ -41,6 +41,7 @@ typedef struct Object
 {
 	Color color;
 	string name;
+	float translate[3];
 	float (*normals)[3];
 	float (*vertices)[3];
 	Point (*faces)[3];
@@ -116,7 +117,7 @@ float camTrack[2] = {0.0, 0.0};
 float camDolly = -2.0;
 
 int sManip = -1;
-int prevMouse[2];
+float prevDrag[3] = {0.0, 0.0, 0.0};
 
 GLUI *glui;
 GLUI_EditText *objFileNameTextField;
@@ -212,6 +213,9 @@ int loadObj(char *fileName, Object &obj)
 	obj.numNormals = numNormals;
 	obj.faces = new Point [numFaces][3];
 	obj.numFaces = numFaces;
+	obj.translate[0] = 0.0;
+	obj.translate[1] = 0.0;
+	obj.translate[2] = 0.0;
 
 	file.clear();
 	file.seekg(ios::beg);
@@ -374,14 +378,15 @@ void drawObjects(GLenum mode)
 
 	for (int i = 0; i < (int) Objects.size(); i++)
 	{
-		if (mode == GL_SELECT)
-			glLoadName(i + 3);
+		Object obj = Objects.at(i);
+		glPushMatrix();
+		glTranslatef(obj.translate[0], obj.translate[1], obj.translate[2]);
 
-		if (mode == GL_RENDER)
-			glColor3f(Objects.at(i).color.r, Objects.at(i).color.g, Objects.at(i).color.b);
+		glLoadName(i + 3);
+		glColor3f(obj.color.r, obj.color.g, obj.color.b);
 
 		if ((mode == GL_SELECT) || ((mode == GL_RENDER) && (objSelected !=i)))
-			glCallList(Objects.at(i).displayList);
+			glCallList(obj.displayList);
 
 		if (objSelected == i)
 		{
@@ -392,7 +397,7 @@ void drawObjects(GLenum mode)
 				// Draw the wire frame
 				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 				glColor3f(1.f, 0, 0);
-				glCallList(Objects.at(i).displayList);
+				glCallList(obj.displayList);
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 				// Draw the object's axes
@@ -447,6 +452,7 @@ void drawObjects(GLenum mode)
 			glPopMatrix();
 		}
 	}
+	glPopMatrix();
 }
 
 void setupVV()
@@ -560,8 +566,17 @@ void updateDrag(int x, int y, bool move) {
 	oAxis.p2[sManip] = 1.0;
 
 	closestApproach(oAxis, mRay, intersect);
-
 	cout << "Closest To: (" << intersect[0] << ", " << intersect[1] << ", " << intersect[2] << ")" << endl;
+
+	if (move) {
+		cout << "Moved By: " << intersect[sManip] - prevDrag[sManip] << endl;
+		Objects.at(objSelected).translate[sManip] += (intersect[sManip] - prevDrag[sManip]);
+	}
+
+	prevDrag[0] = intersect[0];
+	prevDrag[1] = intersect[1];
+	prevDrag[2] = intersect[2];
+
 }
 
 void myGlutMouse(int button, int button_state, int x, int y)
