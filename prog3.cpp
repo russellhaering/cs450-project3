@@ -20,6 +20,7 @@
 
 #define BACKGROUND_COLOR 0.5, 0.5, 0.5, 1.0
 #define LOCAL_AXIS_SIZE 0.5
+#define ROTATION_RATE (180 / 0.5)
 
 using namespace std;
 
@@ -42,6 +43,7 @@ typedef struct Object
 	Color color;
 	string name;
 	float translate[3];
+	float rotate[16];
 	float (*normals)[3];
 	float (*vertices)[3];
 	Point (*faces)[3];
@@ -213,9 +215,18 @@ int loadObj(char *fileName, Object &obj)
 	obj.numNormals = numNormals;
 	obj.faces = new Point [numFaces][3];
 	obj.numFaces = numFaces;
+
+	// Initialize translations
 	obj.translate[0] = 0.0;
 	obj.translate[1] = 0.0;
 	obj.translate[2] = 0.0;
+
+	// Initialize the rotation matrix
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+	glGetFloatv(GL_MODELVIEW, obj.rotate);
+	glPopMatrix();
 
 	file.clear();
 	file.seekg(ios::beg);
@@ -378,29 +389,43 @@ void drawObjects(GLenum mode)
 
 	for (int i = 0; i < (int) Objects.size(); i++)
 	{
-		Object obj = Objects.at(i);
 		glPushMatrix();
-		glTranslatef(obj.translate[0], obj.translate[1], obj.translate[2]);
+
+		Object *obj = &Objects.at(i);
+		glTranslatef(obj->translate[0], obj->translate[1], obj->translate[2]);
+		glMultMatrixf(obj->rotate);
 
 		glLoadName(i + 3);
-		glColor3f(obj.color.r, obj.color.g, obj.color.b);
+		glColor3f(obj->color.r, obj->color.g, obj->color.b);
 
+		// Display the object normally
 		if ((mode == GL_SELECT) || ((mode == GL_RENDER) && (objSelected !=i)))
-			glCallList(obj.displayList);
+			glCallList(obj->displayList);
 
+		// Display selected objects in wireframe
+		if ((mode == GL_RENDER) && (objSelected == i)) {
+			glDisable(GL_LIGHTING);
+
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			glColor3f(1.f, 0, 0);
+			glCallList(obj->displayList);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			
+			glEnable(GL_LIGHTING);
+		}
+
+		glPopMatrix();
+
+		// Display object axes manipulators
 		if (objSelected == i)
 		{
+			glPushMatrix();
+			glTranslatef(obj->translate[0], obj->translate[1], obj->translate[2]);
 
+			// Draw the object's axes in render mode only
 			if (mode == GL_RENDER) {
 				glDisable(GL_LIGHTING);
 
-				// Draw the wire frame
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-				glColor3f(1.f, 0, 0);
-				glCallList(obj.displayList);
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-				// Draw the object's axes
 				glLineWidth(3);
 				glBegin(GL_LINES);
 				{
@@ -424,6 +449,8 @@ void drawObjects(GLenum mode)
 
 				glEnable(GL_LIGHTING);
 			}
+
+			// Draw the object's manipulators regardless
 
 			// X Axis - Red
 			glColor3f(1.0, 0.0, 0.0);
@@ -450,9 +477,10 @@ void drawObjects(GLenum mode)
 			glLoadName(2);
 			glutSolidCone(.04, .1, 10, 10);
 			glPopMatrix();
+
+			glPopMatrix();
 		}
 	}
-	glPopMatrix();
 }
 
 void setupVV()
@@ -569,8 +597,42 @@ void updateDrag(int x, int y, bool move) {
 	cout << "Closest To: (" << intersect[0] << ", " << intersect[1] << ", " << intersect[2] << ")" << endl;
 
 	if (move) {
-		cout << "Moved By: " << intersect[sManip] - prevDrag[sManip] << endl;
-		Objects.at(objSelected).translate[sManip] += (intersect[sManip] - prevDrag[sManip]);
+		Object *obj = &Objects.at(objSelected);
+		float distance = intersect[sManip] - prevDrag[sManip];
+		float vec[3] = {0.0, 0.0, 0.0};
+
+		cout << "Moved By: " << distance << endl;
+
+		switch (transType) {
+			case TRANS:
+				// Update the objects translation parameters
+				cout << "Translating Object" << endl;
+				obj->translate[sManip] += distance;
+				break;
+			case ROT:
+				// Load the object's rotation matrix, apply rotations, then
+				// store the matrix back
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadMatrixf(obj->rotate);
+				vec[sManip] = 1.0;
+				glRotatef(distance * ROTATION_RATE, vec[0], vec[1], vec[2]);
+				glGetFloatv(GL_MODELVIEW, obj->rotate);
+				glPopMatrix();
+				break;
+			case SCALE:
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadMatrixf(obj->rotate);
+				vec[0] = 1.0;
+				vec[1] = 1.0;
+				vec[2] = 1.0;
+				vec[sManip] = 1 + distance;
+				glScalef(vec[0], vec[1], vec[2]);
+				glGetFloatv(GL_MODELVIEW, obj->rotate);
+				glPopMatrix();
+				break;
+		}
 	}
 
 	prevDrag[0] = intersect[0];
