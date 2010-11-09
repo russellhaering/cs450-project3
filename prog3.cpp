@@ -49,6 +49,11 @@ typedef struct Object
 
 } Object;
 
+typedef struct {
+	float p1[3];
+	float p2[3];
+} Line;
+
 enum buttonTypes {OBJ_TEXTFIELD = 0, LOAD_BUTTON};
 enum colors	{RED = 0, GREEN, BLUE};
 enum projections {ORTHO = 0, PERSP};
@@ -110,6 +115,9 @@ float camRotMat[16];
 float camTrack[2] = {0.0, 0.0};
 float camDolly = -2.0;
 
+int sManip = -1;
+int prevMouse[2];
+
 GLUI *glui;
 GLUI_EditText *objFileNameTextField;
 GLUI_String fileName = GLUI_String("frog.obj");
@@ -117,6 +125,46 @@ GLUI_String fileName = GLUI_String("frog.obj");
 /************************************************************************/
 /*                       FUNCTION DEFINITIONS                           */
 /************************************************************************/
+
+// Dot product of two 3d vectors
+#define dot3(a, b)	((a[0] * b[0]) + (a[1] * b[1]) + (a[2] * b[2]))
+
+// Subtract two 3d vectors into a third
+void sub3(float *a, float *b, float *r) {
+	r[0] = a[0] - b[0];
+	r[1] = a[1] - b[1];
+	r[2] = a[2] - b[2];
+}
+
+// Identifies the closest point on line l1 to line l2
+void closestApproach(Line l1, Line l2, float *point) {
+	float u[3], v[3], w[3], a, b, c, d, e, D, sc;
+	
+	sub3(l1.p2, l1.p1, u);
+	sub3(l2.p2, l2.p1, v);
+	sub3(l1.p1, l2.p1, w);
+
+	a = dot3(u, u);
+	b = dot3(u, v);
+	c = dot3(v, v);
+	d = dot3(u, w);
+	e = dot3(v, w);
+
+	D = (a * c) - (b * b);
+
+	if (D < .0001) {
+		// The lines are nearly parallel
+		sc = 0.0;
+	}
+	else {
+		sc = ((b * e) - (c * d)) / D;
+	}
+
+	point[0] = l1.p1[0] + u[0] * sc;
+	point[1] = l1.p1[1] + u[1] * sc;
+	point[2] = l1.p1[2] + u[2] * sc;
+}
+
 /// Reads the contents of the obj file and appends the data at the end of
 /// the vector of Objects. This time we allow the same object to be loaded
 /// several times.
@@ -465,43 +513,88 @@ void myGlutReshape(int x, int y)
 	glutPostRedisplay();
 }
 
+void updateDrag(int x, int y, bool move) {
+	GLint vp[4];
+	GLdouble mv[16];
+	GLdouble pj[16];
+	GLdouble vX, vY, vZ;
+	Line mRay, oAxis;
+	float intersect[3];
+
+	glGetIntegerv(GL_VIEWPORT, vp);
+	glGetDoublev(GL_MODELVIEW_MATRIX, mv);
+	glGetDoublev(GL_PROJECTION_MATRIX, pj);
+
+	gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
+
+	mRay.p1[0] = camTrack[0];
+	mRay.p1[1] = camTrack[1];
+	mRay.p1[2] = camDolly;
+	
+	mRay.p2[0] = vX;
+	mRay.p2[1] = vY;
+	mRay.p2[2] = vZ;
+	
+	oAxis.p1[0] = 1.0;
+	oAxis.p1[1] = 0;
+	oAxis.p1[2] = 0;
+
+	oAxis.p2[0] = 0;
+	oAxis.p2[1] = 0;
+	oAxis.p2[2] = 0;
+
+	closestApproach(oAxis, mRay, intersect);
+
+	cout << "Projected To: (" << vX << ", " << vY << ", " << vZ << ")" << endl;
+	cout << "Closest To: (" << intersect[0] << ", " << intersect[1] << ", " << intersect[2] << ")" << endl;
+}
+
 void myGlutMouse(int button, int button_state, int x, int y)
 {
 	GLuint selectBuffer[512];
 	GLint viewport[4];
 
-	if (button != GLUT_LEFT_BUTTON || button_state != GLUT_DOWN)
-		return;
+	if (button == GLUT_LEFT_BUTTON) {
+		if (button_state == GLUT_DOWN) {
+			glGetIntegerv(GL_VIEWPORT, viewport);
 
-	glGetIntegerv(GL_VIEWPORT, viewport);
+			glSelectBuffer(512, selectBuffer);
+			glRenderMode(GL_SELECT);
 
-	glSelectBuffer(512, selectBuffer);
-	glRenderMode(GL_SELECT);
+			glInitNames();
+			glPushName(-1);
 
-	glInitNames();
-	glPushName(-1);
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
+			gluPickMatrix((GLdouble) x, (GLdouble) (viewport[3]-y), 2.0, 2.0, viewport);
 
-	gluPickMatrix((GLdouble) x, (GLdouble) (viewport[3]-y), 2.0, 2.0, viewport);
+			if (projType == ORTHO)
+				glOrtho(vl, vr, vb, vt, vn, vf);
+			else
+				glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
 
-	if (projType == ORTHO)
-		glOrtho(vl, vr, vb, vt, vn, vf);
-	else
-		glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
+			glMatrixMode(GL_MODELVIEW);
+			drawObjects(GL_SELECT);
 
-	glMatrixMode(GL_MODELVIEW);
-	drawObjects(GL_SELECT);
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+			glFlush();
 
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glFlush();
+			processHits(glRenderMode(GL_RENDER), selectBuffer);
 
-	processHits(glRenderMode(GL_RENDER), selectBuffer);
+			glutPostRedisplay();
+		}
+		else if (button_state == GLUT_UP) {
+			if (sManip >= 0) {
+				cout << "Released Manipulator: " << sManip << endl;
+			}
+			sManip = -1;
+		}
+	}
 
-	glutPostRedisplay();
+	updateDrag(x, y, false);
 }
 
 void processHits(GLint hits, GLuint buffer[])
@@ -527,7 +620,11 @@ void processHits(GLint hits, GLuint buffer[])
 		green = Objects.at(objSelected).color.g;
 		blue = Objects.at(objSelected).color.b;
 	}
-	else if (pick < 0) {
+	else if (pick >= 0) {
+		sManip = pick;
+		cout << "Manipulator Selected: " << sManip << endl;
+	}
+	else {
 		objSelected = -1;
 		red = 1.f;
 		green = 1.f;
