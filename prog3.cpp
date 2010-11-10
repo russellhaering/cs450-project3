@@ -43,6 +43,7 @@ typedef struct Object
 	Color color;
 	string name;
 	float translate[3];
+	float scale[3];
 	float rotate[16];
 	float (*normals)[3];
 	float (*vertices)[3];
@@ -124,6 +125,11 @@ float prevDrag[3] = {0.0, 0.0, 0.0};
 GLUI *glui;
 GLUI_EditText *objFileNameTextField;
 GLUI_String fileName = GLUI_String("frog.obj");
+
+float light0_pos[]	=	{0.f, 3.f, 2.f, 1.f};
+float diffuse0[]	=	{1.f, 1.f, 1.f, .5f};
+float ambient0[]	=	{.1f, .1f, .1f, 1.f};
+float specular0[]	=	{1.f, 1.f, 1.f, .5f};
 
 /************************************************************************/
 /*                       FUNCTION DEFINITIONS                           */
@@ -220,6 +226,11 @@ int loadObj(char *fileName, Object &obj)
 	obj.translate[0] = 0.0;
 	obj.translate[1] = 0.0;
 	obj.translate[2] = 0.0;
+
+	// Initialize the scales
+	obj.scale[0] = 1.0;
+	obj.scale[1] = 1.0;
+	obj.scale[2] = 1.0;
 
 	// Initialize the rotation matrix
 	glMatrixMode(GL_MODELVIEW);
@@ -386,6 +397,10 @@ void colorCB(int id)
 
 void drawObjects(GLenum mode)
 {
+	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 
 	for (int i = 0; i < (int) Objects.size(); i++)
 	{
@@ -393,6 +408,7 @@ void drawObjects(GLenum mode)
 
 		Object *obj = &Objects.at(i);
 		glTranslatef(obj->translate[0], obj->translate[1], obj->translate[2]);
+		glScalef(obj->scale[0], obj->scale[1], obj->scale[2]);
 		glMultMatrixf(obj->rotate);
 
 		glLoadName(i + 3);
@@ -432,17 +448,17 @@ void drawObjects(GLenum mode)
 					// X Axis - Red
 					glColor3f(1.0, 0.0, 0.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(LOCAL_AXIS_SIZE, 0.0, 0.0);
+					glVertex3f(obj->scale[0] * LOCAL_AXIS_SIZE, 0.0, 0.0);
 
 					// Y Axis - Green
 					glColor3f(0.0, 1.0, 0.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(0.0, LOCAL_AXIS_SIZE, 0.0);
+					glVertex3f(0.0, obj->scale[1] * LOCAL_AXIS_SIZE, 0.0);
 
 					// Z Axis - Blue
 					glColor3f(0.0, 0.0, 1.0);
 					glVertex3f(0.0, 0.0, 0.0);
-					glVertex3f(0.0, 0.0, LOCAL_AXIS_SIZE);
+					glVertex3f(0.0, 0.0, obj->scale[2] * LOCAL_AXIS_SIZE);
 				}
 				glEnd();
 				glLineWidth(1);
@@ -455,7 +471,7 @@ void drawObjects(GLenum mode)
 			// X Axis - Red
 			glColor3f(1.0, 0.0, 0.0);
 			glPushMatrix();
-			glTranslatef(LOCAL_AXIS_SIZE, 0.0, 0.0);
+			glTranslatef(obj->scale[0] * LOCAL_AXIS_SIZE, 0.0, 0.0);
 			glRotatef(90.0, 0.0, 1.0, 0.0);
 			glLoadName(0);
 			glutSolidCone(.04, .1, 10, 10);
@@ -464,7 +480,7 @@ void drawObjects(GLenum mode)
 			// Y Axis - Green
 			glColor3f(0.0, 1.0, 0.0);
 			glPushMatrix();
-			glTranslatef(0.0, LOCAL_AXIS_SIZE, 0.0);
+			glTranslatef(0.0, obj->scale[1] * LOCAL_AXIS_SIZE, 0.0);
 			glRotatef(-90.0, 1.0, 0.0, 0.0);
 			glLoadName(1);
 			glutSolidCone(.04, .1, 10, 10);
@@ -473,7 +489,7 @@ void drawObjects(GLenum mode)
 			// Z Axis - Blue
 			glColor3f(0.0, 0.0, 1.0);
 			glPushMatrix();
-			glTranslatef(0.0, 0.0, LOCAL_AXIS_SIZE);
+			glTranslatef(0.0, 0.0, obj->scale[2] * LOCAL_AXIS_SIZE);
 			glLoadName(2);
 			glutSolidCone(.04, .1, 10, 10);
 			glPopMatrix();
@@ -606,7 +622,6 @@ void updateDrag(int x, int y, bool move) {
 		switch (transType) {
 			case TRANS:
 				// Update the objects translation parameters
-				cout << "Translating Object" << endl;
 				obj->translate[sManip] += distance;
 				break;
 			case ROT:
@@ -621,16 +636,8 @@ void updateDrag(int x, int y, bool move) {
 				glPopMatrix();
 				break;
 			case SCALE:
-				glMatrixMode(GL_MODELVIEW);
-				glPushMatrix();
-				glLoadMatrixf(obj->rotate);
-				vec[0] = 1.0;
-				vec[1] = 1.0;
-				vec[2] = 1.0;
-				vec[sManip] = 1 + distance;
-				glScalef(vec[0], vec[1], vec[2]);
-				glGetFloatv(GL_MODELVIEW, obj->rotate);
-				glPopMatrix();
+				obj->scale[sManip] += (distance / LOCAL_AXIS_SIZE);
+				if (obj->scale[sManip] < 0) obj->scale[sManip] = 0;
 				break;
 		}
 	}
@@ -738,19 +745,10 @@ void processHits(GLint hits, GLuint buffer[])
 
 void initScene()
 {
-	float light0_pos[]	=	{0.f, 3.f, 2.f, 1.f};
-	float diffuse0[]	=	{1.f, 1.f, 1.f, .5f};
-	float ambient0[]	=	{.1f, .1f, .1f, 1.f};
-	float specular0[]	=	{1.f, 1.f, 1.f, .5f};
-
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_COLOR_MATERIAL);
-	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
 	glPolygonOffset(0, -10);
