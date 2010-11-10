@@ -521,8 +521,8 @@ void myGlutDisplay(void)
 	 */
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glMultMatrixf(camRotMat);
 	glTranslatef(camTrack[0], camTrack[1], camDolly);
+	glMultMatrixf(camRotMat);
 
 	glColor3f(0.0, 0.0, 0.0);
 	glBegin(GL_LINES);
@@ -575,29 +575,19 @@ void updateDrag(int x, int y, bool move) {
 	glGetDoublev(GL_MODELVIEW_MATRIX, mv);
 	glGetDoublev(GL_PROJECTION_MATRIX, pj);
 
+	// Project a ray deep into the scene where the mouse clicked
 	gluUnProject((float) x, (float) (vp[3] - y), 1.0, mv, pj, vp, &vX, &vY, &vZ);
 
 	mRay.p2[0] = vX;
 	mRay.p2[1] = vY;
 	mRay.p2[2] = vZ;
 
-	/* In perspective mode, the "mouse ray" comes from the location of the camera.
-	 * In orthographic mode, however, the camera is a plane instead of a point, so
-	 * we "cheat" and project a second point at a different depth along the same
-	 * "mouse ray" to form a line.
-	 */
-	if (projType == ORTHO) {
-		gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
+	// Project a ray shallow into the scene where the mouse clicked
+	gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
 
-		mRay.p1[0] = vX;
-		mRay.p1[1] = vY;
-		mRay.p1[2] = vZ;
-	}
-	else {
-		mRay.p1[0] = -camTrack[0];
-		mRay.p1[1] = -camTrack[1];
-		mRay.p1[2] = -camDolly;
-	}
+	mRay.p1[0] = vX;
+	mRay.p1[1] = vY;
+	mRay.p1[2] = vZ;
 
 	oAxis.p1[0] = 0;
 	oAxis.p1[1] = 0;
