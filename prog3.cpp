@@ -567,43 +567,51 @@ void updateDrag(int x, int y, bool move) {
 	GLint vp[4];
 	GLdouble mv[16];
 	GLdouble pj[16];
-	GLdouble vX, vY, vZ;
+	GLdouble v1X, v1Y, v1Z, v2X, v2Y, v2Z;
 	Line mRay, oAxis;
 	float intersect[3];
+	Object *obj = &Objects.at(objSelected);
 
 	glGetIntegerv(GL_VIEWPORT, vp);
 	glGetDoublev(GL_MODELVIEW_MATRIX, mv);
 	glGetDoublev(GL_PROJECTION_MATRIX, pj);
 
-	// Project a ray deep into the scene where the mouse clicked
-	gluUnProject((float) x, (float) (vp[3] - y), 1.0, mv, pj, vp, &vX, &vY, &vZ);
+	/* Project two rays into the scene along the "mouse ray", one to the near
+	 * clipping plane and one to the far one. Then construct a line between
+	 * these points
+	 */
+	gluUnProject((float) x, (float) (vp[3] - y), 1.0, mv, pj, vp, &v1X, &v1Y, &v1Z);
+	gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &v2X, &v2Y, &v2Z);
 
-	mRay.p2[0] = vX;
-	mRay.p2[1] = vY;
-	mRay.p2[2] = vZ;
+	mRay.p2[0] = v1X;
+	mRay.p2[1] = v1Y;
+	mRay.p2[2] = v1Z;
 
-	// Project a ray shallow into the scene where the mouse clicked
-	gluUnProject((float) x, (float) (vp[3] - y), 0.0, mv, pj, vp, &vX, &vY, &vZ);
+	mRay.p1[0] = v2X;
+	mRay.p1[1] = v2Y;
+	mRay.p1[2] = v2Z;
 
-	mRay.p1[0] = vX;
-	mRay.p1[1] = vY;
-	mRay.p1[2] = vZ;
+	/* Build a second line through the origin of the selected object along hte
+	 * axis of the selected manipulator
+	 */
+	oAxis.p1[0] = obj->translate[0];
+	oAxis.p1[1] = obj->translate[1];
+	oAxis.p1[2] = obj->translate[2];
 
-	oAxis.p1[0] = 0;
-	oAxis.p1[1] = 0;
-	oAxis.p1[2] = 0;
+	oAxis.p2[0] = obj->translate[0];
+	oAxis.p2[1] = obj->translate[1];
+	oAxis.p2[2] = obj->translate[2];
 
-	oAxis.p2[0] = 0;
-	oAxis.p2[1] = 0;
-	oAxis.p2[2] = 0;
+	oAxis.p2[sManip] += 1.0;
 
-	oAxis.p2[sManip] = 1.0;
-
+	/* Find the point on the second (object axis) line closest to any point on
+	 * the first (mouse ray) line.
+	 */
 	closestApproach(oAxis, mRay, intersect);
 	cout << "Closest To: (" << intersect[0] << ", " << intersect[1] << ", " << intersect[2] << ")" << endl;
 
+	// Transform the selected object if this isn't the initial click
 	if (move) {
-		Object *obj = &Objects.at(objSelected);
 		float distance = intersect[sManip] - prevDrag[sManip];
 		float vec[3] = {0.0, 0.0, 0.0};
 
@@ -626,12 +634,14 @@ void updateDrag(int x, int y, bool move) {
 				glPopMatrix();
 				break;
 			case SCALE:
+				// Adjust the scale of the object to match the drag distance
 				obj->scale[sManip] += (distance / LOCAL_AXIS_SIZE);
 				if (obj->scale[sManip] < 0) obj->scale[sManip] = 0;
 				break;
 		}
 	}
 
+	// Store the current drag location for future differentials
 	prevDrag[0] = intersect[0];
 	prevDrag[1] = intersect[1];
 	prevDrag[2] = intersect[2];
