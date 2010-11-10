@@ -18,7 +18,9 @@
 #include <fstream>
 #include <iostream>
 
-#define BACKGROUND_COLOR 0.5, 0.5, 0.5, 1.0
+#define BACKGROUND_COLOR 0.3, 0.3, 0.3, 1.0
+#define FLOOR_COLOR 0.8, 0.8, 0.8
+#define CONTOUR_COLOR 0.0, 0.0, 0.0
 #define LOCAL_AXIS_SIZE 0.5
 #define ROTATION_RATE (180 / 0.5)
 
@@ -397,11 +399,6 @@ void colorCB(int id)
 
 void drawObjects(GLenum mode)
 {
-	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
-
 	for (int i = 0; i < (int) Objects.size(); i++)
 	{
 		glPushMatrix();
@@ -496,6 +493,7 @@ void drawObjects(GLenum mode)
 
 			glPopMatrix();
 		}
+		glPopMatrix();
 	}
 }
 
@@ -510,33 +508,54 @@ void setupVV()
 			glFrustum(vl * fov/FOVMAX, vr * fov/FOVMAX, vb * fov/FOVMAX, vt * fov/FOVMAX, vn, vf);
 }
 
-
+void drawFloor()
+{
+	int i, j;
+	glBegin(GL_QUADS);
+	for (i = -20; i < 20; i++) {
+		for (j = -20; j < 20; j++) {
+			glVertex3f(i, -1.0, j);
+			glVertex3f(i + 1.0, -1.0, j);
+			glVertex3f(i + 1.0, -1.0, j + 1.0);
+			glVertex3f(i, -1.0, j + 1.0);
+		}
+	}
+	glEnd();
+}
 
 void myGlutDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	/* The next 3 lines are temporary to make sure the objects show up in the
-	 * view volume when you load them. You will need to modify this
-	 */
+	// Perform viewing transformations
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(camTrack[0], camTrack[1], camDolly);
 	glMultMatrixf(camRotMat);
 
-	glColor3f(0.0, 0.0, 0.0);
-	glBegin(GL_LINES);
-	{
-		glVertex3f(0.0, 0.0, 20.0);
-		glVertex3f(0.0, 0.0, -20.0);
-		glVertex3f(0.0, 20.0, 0.0);
-		glVertex3f(0.0, -20.0, 0.0);
-		glVertex3f(20.0, 0.0, 0.0);
-		glVertex3f(-20.0, 0.0, 0.0);
-	}
-	glEnd();
+	// Set the light position
+	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse0);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
+
+	// Draw the floor
+	glDisable(GL_LIGHTING);
+
+	// Draw the floor itself
+	glColor3f(FLOOR_COLOR);
+	drawFloor();
+
+	// Draw the floor contours
+	glColor3f(CONTOUR_COLOR);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	drawFloor();
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glEnable(GL_LIGHTING);
 
 	drawObjects(GL_RENDER);
+
 	glutSwapBuffers();
 }
 
@@ -751,6 +770,7 @@ void initScene()
 	glEnable(GL_COLOR_MATERIAL);
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
+	glEnable(GL_POLYGON_OFFSET_LINE);
 	glPolygonOffset(0, -10);
 
 	setupVV();
