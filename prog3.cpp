@@ -545,10 +545,8 @@ void myGlutDisplay(void)
 	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient0);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, specular0);
 
-	// Draw the floor
-	glDisable(GL_LIGHTING);
-
 	// Draw the floor itself
+	glDisable(GL_LIGHTING);
 	glColor3f(FLOOR_COLOR);
 	drawFloor();
 
@@ -558,6 +556,7 @@ void myGlutDisplay(void)
 	drawFloor();
 
 	// Draw the objects
+	glEnable(GL_LIGHTING);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_LIGHTING);
 	drawObjects(GL_RENDER);
