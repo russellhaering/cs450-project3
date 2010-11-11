@@ -18,7 +18,7 @@
 #include <fstream>
 #include <iostream>
 
-#define BACKGROUND_COLOR 0.3, 0.3, 0.3, 1.0
+#define BACKGROUND_COLOR 0.0, 0.0, 0.0, 1.0
 #define FLOOR_COLOR 0.8, 0.8, 0.8
 #define CONTOUR_COLOR 0.0, 0.0, 0.0
 #define LOCAL_AXIS_SIZE 0.5
@@ -113,13 +113,13 @@ float vl = -1.f;
 float vr = 1.f;
 float vb = -1.f;
 float vt = 1.f;
-const float vn = .5;
-const float vf = 10;
+const float vn = .2;
+const float vf = 20;
 
 float scaleFactor	= 1.f;
 float camRotMat[16];
 float camTrack[2] = {0.0, 0.0};
-float camDolly = -2.0;
+float camDolly = 0.0;
 
 int sManip = -1;
 float prevDrag[3] = {0.0, 0.0, 0.0};
@@ -147,7 +147,8 @@ void sub3(float *a, float *b, float *r) {
 	r[2] = a[2] - b[2];
 }
 
-// Identifies the closest point on line l1 to line l2
+// Identifies the closest point on line l1 to line l2. This code is based on
+// this algorithm:  http://softsurfer.com/Archive/algorithm_0106/algorithm_0106.htm
 void closestApproach(Line l1, Line l2, float *point) {
 	float u[3], v[3], w[3], a, b, c, d, e, D, sc;
 
@@ -176,9 +177,9 @@ void closestApproach(Line l1, Line l2, float *point) {
 	point[2] = l1.p1[2] + u[2] * sc;
 }
 
-/// Reads the contents of the obj file and appends the data at the end of
-/// the vector of Objects. This time we allow the same object to be loaded
-/// several times.
+// Reads the contents of the obj file and appends the data at the end of
+// the vector of Objects. This time we allow the same object to be loaded
+// several times.
 int loadObj(char *fileName, Object &obj)
 {
 	ifstream file;
@@ -404,6 +405,8 @@ void drawObjects(GLenum mode)
 		glPushMatrix();
 
 		Object *obj = &Objects.at(i);
+
+		// Apply object transformations
 		glTranslatef(obj->translate[0], obj->translate[1], obj->translate[2]);
 		glScalef(obj->scale[0], obj->scale[1], obj->scale[2]);
 		glMultMatrixf(obj->rotate);
@@ -423,7 +426,7 @@ void drawObjects(GLenum mode)
 			glColor3f(1.f, 0, 0);
 			glCallList(obj->displayList);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			
+
 			glEnable(GL_LIGHTING);
 		}
 
@@ -493,7 +496,6 @@ void drawObjects(GLenum mode)
 
 			glPopMatrix();
 		}
-		glPopMatrix();
 	}
 }
 
@@ -527,11 +529,15 @@ void myGlutDisplay(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Perform viewing transformations
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(camTrack[0], camTrack[1], camDolly);
+
+	// Camera transformations
+	glTranslatef(0, 0, -2);
 	glMultMatrixf(camRotMat);
+	glTranslatef(0, 0, 2);
+
+	glTranslatef(camTrack[0], camTrack[1], camDolly);
 
 	// Set the light position
 	glLightfv(GL_LIGHT0, GL_POSITION, light0_pos);
@@ -551,9 +557,9 @@ void myGlutDisplay(void)
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	drawFloor();
 
+	// Draw the objects
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_LIGHTING);
-
 	drawObjects(GL_RENDER);
 
 	glutSwapBuffers();
@@ -582,6 +588,13 @@ void myGlutReshape(int x, int y)
 	glutPostRedisplay();
 }
 
+// Update the transformations on the currently selected object based on how the
+// selected manipulator has been dragged. This computes the point on the axis
+// along which the drag is occurring that the "mouse ray" comes closest to and
+// computes how far the manipulator should move. Then, based on the selected
+// transformation it will update the transformation properties of the selected
+// object (unless 'move' is false, in which case all it does is initialize the
+// drag location for later derivation).
 void updateDrag(int x, int y, bool move) {
 	GLint vp[4];
 	GLdouble mv[16];
@@ -771,7 +784,7 @@ void initScene()
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(BACKGROUND_COLOR);
 	glEnable(GL_POLYGON_OFFSET_LINE);
-	glPolygonOffset(0, -10);
+	glPolygonOffset(0, -100);
 
 	setupVV();
 }
